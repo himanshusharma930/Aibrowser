@@ -139,17 +139,22 @@ async function initializeMainWindow(): Promise<BrowserWindow> {
     height: mainWindow.getBounds().height,
   });
 
-  // Create detail panel area
+  // Create browser view (main browsing area on the LEFT side)
   detailView = createView(`https://www.google.com`, "view", '1');
   mainWindow.contentView.addChildView(detailView);
+  
+  // Position browser view on the LEFT side (75% of window width by default)
+  const windowBounds = mainWindow.getBounds();
+  const browserWidth = Math.floor(windowBounds.width * 0.75); // 75% for browser panel
+  
   detailView.setBounds({
-    x: 818,
-    y: 264,
-    width: 748,
-    height: 560,
+    x: 0,
+    y: 0,
+    width: browserWidth,
+    height: windowBounds.height,
   });
 
-  // Set detail view hidden by default
+  // Browser view is HIDDEN by default - only shows after first message is sent
   detailView.setVisible(false);
 
   detailView.webContents.setWindowOpenHandler(({url}) => {
@@ -272,6 +277,10 @@ async function initializeMainWindow(): Promise<BrowserWindow> {
   await app.whenReady();
   console.log("App is ready");
 
+  // Register all IPC handlers FIRST (before creating windows)
+  registerAllIpcHandlers();
+  console.log('[IPC] All IPC handlers registered');
+
   // Register global client protocol
   registerClientProtocol(protocol);
 
@@ -326,9 +335,6 @@ app.on("window-all-closed", () => {
   // Don't call app.quit(), let app continue running
   // Scheduled tasks will continue executing in background
 });
-
-// Register all IPC handlers
-registerAllIpcHandlers();
 
 reloadOnChange();
 // setupAutoUpdater();

@@ -54,5 +54,33 @@ export function registerViewHandlers() {
     }
   });
 
-  console.log('[IPC] View control handlers registered');
+  // Update detail view bounds for resizable panel coordination
+  ipcMain.handle('update-detail-view-bounds', async (event, bounds: { x: number; y: number; width: number; height: number }) => {
+    try {
+      console.log('IPC update-detail-view-bounds received:', bounds);
+      const context = windowContextManager.getContext(event.sender.id);
+      if (!context || !context.detailView) {
+        console.warn('DetailView not found for bounds update');
+        return { success: false, error: 'DetailView not found' };
+      }
+
+      // Validate bounds to prevent negative values
+      const validatedBounds = {
+        x: Math.max(0, bounds.x),
+        y: Math.max(0, bounds.y),
+        width: Math.max(100, bounds.width), // Minimum 100px width
+        height: Math.max(100, bounds.height) // Minimum 100px height
+      };
+
+      context.detailView.setBounds(validatedBounds);
+      console.log('DetailView bounds updated:', validatedBounds);
+
+      return { success: true, bounds: validatedBounds };
+    } catch (error: any) {
+      console.error('IPC update-detail-view-bounds error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  console.log('[IPC] View control handlers registered (including layout transformation handlers)');
 }

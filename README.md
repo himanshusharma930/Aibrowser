@@ -84,6 +84,8 @@ The built application will include your API configuration, so end users don't ne
 - **Scheduled Tasks**: Create and manage automated recurring tasks
 - **Speech & TTS**: Voice recognition and text-to-speech integration
 - **File Management**: Advanced file operations and management
+- **Resizable Layout**: Dynamic panel layout with browser-first design and WebContentsView coordination
+- **Layout Persistence**: Automatic saving and restoration of user's preferred panel configurations
 
 ## Screenshots
 
@@ -131,7 +133,23 @@ Customize AI agent behavior with custom prompts and manage MCP tools for enhance
 
 ## Documentation
 
+### User Guides
 - [Configuration Guide](./docs/CONFIGURATION.md) - Detailed API key setup instructions
+- [API Documentation](./docs/API.md) - Complete API reference for developers
+
+### Developer Documentation
+- [IPC Quick Reference](./docs/IPC_QUICK_REFERENCE.md) - Quick guide for working with IPC communication
+- [IPC Architecture Diagrams](./docs/IPC_ARCHITECTURE_DIAGRAM.md) - Visual guide to IPC system with Mermaid diagrams
+- [IPC System Architecture](./docs/eko-docs/architecture/ipc-system.md) - Comprehensive IPC architecture guide
+- [Layout Transformation Architecture](./docs/eko-docs/architecture/layout-transformation.md) - Resizable panel system and WebContentsView coordination
+- [Architecture Changes Log](./docs/ARCHITECTURE_CHANGES.md) - Track significant architectural changes
+- [Browser View Migration Guide](./docs/BROWSER_VIEW_MIGRATION_GUIDE.md) - **NEW**: Guide for browser view repositioning changes
+
+### Key Architecture Notes
+- **IPC Handler Registration**: All IPC handlers are registered **before** window creation to prevent race conditions
+- **Multi-Window Support**: Window context isolation ensures proper operation across multiple windows
+- **Type Safety**: Full TypeScript coverage for all IPC methods and component interfaces
+- **Browser View Architecture** (Updated Nov 7, 2025): Browser view now positioned on LEFT side (75% width, full height) as primary browsing area
 
 ## Acknowledgements
 

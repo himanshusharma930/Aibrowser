@@ -350,12 +350,16 @@ export const ModelConfigBar: React.FC = () => {
           className="flex-1 custom-select"
           size="middle"
           style={{ minWidth: '160px' }}
-          dropdownStyle={{
-            background: 'rgba(8, 12, 16, 0.96)',
-            backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(145, 75, 241, 0.3)',
-            borderRadius: '12px',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(145, 75, 241, 0.2)',
+          styles={{
+            popup: {
+              root: {
+                background: 'rgba(8, 12, 16, 0.96)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(145, 75, 241, 0.3)',
+                borderRadius: '12px',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(145, 75, 241, 0.2)',
+              }
+            }
           }}
         >
           {PROVIDERS.map(p => (
@@ -372,12 +376,16 @@ export const ModelConfigBar: React.FC = () => {
               size="middle"
               style={{ minWidth: '200px' }}
               loading={isFetchingModels}
-              dropdownStyle={{
-                background: 'rgba(8, 12, 16, 0.96)',
-                backdropFilter: 'blur(20px)',
-                border: '1px solid rgba(145, 75, 241, 0.3)',
-                borderRadius: '12px',
-                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(145, 75, 241, 0.2)',
+              styles={{
+                popup: {
+                  root: {
+                    background: 'rgba(8, 12, 16, 0.96)',
+                    backdropFilter: 'blur(20px)',
+                    border: '1px solid rgba(145, 75, 241, 0.3)',
+                    borderRadius: '12px',
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(145, 75, 241, 0.2)',
+                  }
+                }
               }}
               notFoundContent={isFetchingModels ? 'Fetching models...' : 'No models available'}
             >
@@ -412,12 +420,16 @@ export const ModelConfigBar: React.FC = () => {
             className="flex-1 custom-select"
             size="middle"
             style={{ minWidth: '200px' }}
-            dropdownStyle={{
-              background: 'rgba(8, 12, 16, 0.96)',
-              backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(145, 75, 241, 0.3)',
-              borderRadius: '12px',
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(145, 75, 241, 0.2)',
+            styles={{
+              popup: {
+                root: {
+                  background: 'rgba(8, 12, 16, 0.96)',
+                  backdropFilter: 'blur(20px)',
+                  border: '1px solid rgba(145, 75, 241, 0.3)',
+                  borderRadius: '12px',
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(145, 75, 241, 0.2)',
+                }
+              }
             }}
           >
             {MODELS[selectedProvider]?.map(model => (

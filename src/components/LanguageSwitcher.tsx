@@ -20,7 +20,7 @@ export const LanguageSwitcher: React.FC = () => {
       options={languages}
       size="small"
       className='!text-text-01-dark'
-      popupClassName='language-switcher-dropdown'
+      classNames={{ popup: { root: 'language-switcher-dropdown' } }}
     />
   );
 };

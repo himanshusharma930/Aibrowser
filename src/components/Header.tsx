@@ -45,9 +45,8 @@ export default function Header() {
           onClick={() => goback()}
           className='cursor-pointer ml-8 flex items-center'
         >
-          <span className='text-3xl font-bold  tracking-normal hover:scale-105 transition-all duration-300 drop-shadow-2xl relative font-["Berkshire_Swash",_cursive]'>
-            DeepFundAI
-            <span className='absolute inset-0 bg-gradient-to-r from-blue-500/20 via-blue-400/20 to-cyan-500/20 blur-sm -z-10'></span>
+          <span className='text-3xl font-bold tracking-tight hover:scale-105 transition-all duration-200 relative' style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+            Manus
           </span>
         </div>
       )}
