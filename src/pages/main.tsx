@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/router'
-import Header from '@/components/Header'
+import { PanelGroup, Panel, PanelResizeHandle } from 'react-resizable-panels'
+import AISidebarHeader from '@/components/AISidebarHeader'
 import { Input, Slider, Button, App } from 'antd'
 import { EkoResult, StreamCallbackMessage } from '@jarvis-agent/core/dist/types';
 import { MessageList } from '@/components/chat/MessageComponents';
@@ -12,6 +13,11 @@ import { useTaskManager } from '@/hooks/useTaskManager';
 import { useHistoryStore } from '@/stores/historyStore';
 import { scheduledTaskStorage } from '@/lib/scheduled-task-storage';
 import { useTranslation } from 'react-i18next';
+import { loadPersistedLayout, createDebouncedPersist, clampPanelSize } from '@/utils/panel-layout-storage';
+import { calculateDetailViewBounds } from '@/utils/detail-view-bounds';
+import { PanelLayoutState } from '@/type';
+import { useLayoutMode } from '@/hooks/useLayoutMode';
+// Resize handle styles are now in globals.css
 
 
 export default function main() {
@@ -62,6 +68,15 @@ export default function main() {
 
     const [ekoRequest, setEkoRequest] = useState<Promise<any> | null>(null)
 
+    // Panel layout state management
+    const [layout, setLayout] = useState<PanelLayoutState>(() => loadPersistedLayout())
+    const debouncedPersist = useMemo(() => createDebouncedPersist(500), [])
+
+    // Layout mode management (full-width vs split)
+    // In scheduled task detail mode, always use split layout
+    const { layoutMode: hookLayoutMode, transitionToSplitLayout, isFirstMessage } = useLayoutMode()
+    const layoutMode = isTaskDetailMode ? 'split' : hookLayoutMode
+
     // Check if current task is running
     const isCurrentTaskRunning = useMemo(() => {
         if (!currentTaskId || isHistoryMode) return false;
@@ -87,18 +102,8 @@ export default function main() {
         taskIdRef.current = currentTaskId;
     }, [currentTaskId]);
 
-    // Monitor detail panel display status changes, synchronize control of detail view
-    useEffect(() => {
-        if (window.api && (window.api as any).setDetailViewVisible) {
-            const showDetailView = isHistoryMode ? false : showDetail;
-            (window.api as any).setDetailViewVisible(showDetailView);
-        }
-
-        // When detail panel is hidden, also close history screenshot preview view
-        if (!showDetail && window.api && (window.api as any).hideHistoryView) {
-            (window.api as any).hideHistoryView();
-        }
-    }, [showDetail]);
+    // NOTE: Browser view visibility is now managed separately - it's always visible
+    // The old showDetail state was for browser automation overlay, not the main browser view
 
     // Cleanup logic when page is destroyed
     useEffect(() => {
@@ -120,6 +125,34 @@ export default function main() {
             }
         };
     }, []); // Empty dependency array, only executes on component mount/unmount
+
+    // Initialize browser view bounds on mount (but keep it hidden until first message)
+    useEffect(() => {
+        const initBrowserViewBounds = () => {
+            try {
+                const bounds = calculateDetailViewBounds(window.innerWidth, layout.browserPanelSize, window.innerHeight, layoutMode);
+                if (window.api?.updateDetailViewBounds) {
+                    window.api.updateDetailViewBounds(bounds).catch(error => {
+                        console.error('[Init] Failed to set initial browser view bounds:', error);
+                    });
+                }
+                // Browser view stays hidden until first message is sent (except in scheduled task mode)
+            } catch (error) {
+                console.error('[Init] Error initializing browser view bounds:', error);
+            }
+        };
+
+        initBrowserViewBounds();
+    }, [layoutMode]); // Re-run when layout mode changes
+
+    // In scheduled task detail mode, ensure browser view is visible
+    useEffect(() => {
+        if (isTaskDetailMode && window.api?.setDetailViewVisible) {
+            window.api.setDetailViewVisible(true).catch(error => {
+                console.error('[ScheduledTask] Failed to show browser view:', error);
+            });
+        }
+    }, [isTaskDetailMode]);
 
     // Get current URL and monitor URL changes on initialization
     useEffect(() => {
@@ -613,6 +646,26 @@ export default function main() {
 
         console.log('Sending message', message);
 
+        // Check if this is the first message and transition layout if needed
+        const isFirst = isFirstMessage();
+        if (isFirst) {
+            console.log('[Layout] First message detected, transitioning to split layout');
+            try {
+                // Transition to split layout
+                transitionToSplitLayout();
+                
+                // Show browser view
+                if (window.api?.setDetailViewVisible) {
+                    await window.api.setDetailViewVisible(true);
+                    console.log('[Layout] Browser view shown successfully');
+                }
+            } catch (error) {
+                console.error('[Layout] Failed to transition to split layout:', error);
+                antdMessage.warning(t('layout_transition_failed') || 'Layout transition failed, but continuing...');
+                // Don't block message sending on layout transition failure
+            }
+        }
+
         // Generate new execution ID for each task execution
         const newExecutionId = uuidv4();
         executionIdRef.current = newExecutionId;
@@ -711,158 +764,229 @@ export default function main() {
         }
     };
 
+    // Panel resize handler with constraint validation and WebContentsView coordination
+    const handleResize = useCallback((sizes: number[]) => {
+        const [browserSize, sidebarSize] = sizes;
+
+        // Validate constraints
+        const clampedBrowserSize = clampPanelSize(browserSize, 40, 85);
+        const clampedSidebarSize = 100 - clampedBrowserSize;
+
+        if (Math.abs(browserSize - clampedBrowserSize) > 0.1) {
+            console.warn('[PanelResize] Browser panel out of range, clamped:', browserSize, '→', clampedBrowserSize);
+            return; // Don't update if out of range
+        }
+
+        // Update layout state
+        const newLayout: PanelLayoutState = {
+            browserPanelSize: clampedBrowserSize,
+            aiSidebarSize: clampedSidebarSize,
+            isCollapsed: clampedSidebarSize < 15,
+            lastModified: Date.now()
+        };
+
+        setLayout(newLayout);
+
+        // Calculate and update browser view bounds for WebContentsView coordination
+        try {
+            const bounds = calculateDetailViewBounds(window.innerWidth, clampedBrowserSize, window.innerHeight, layoutMode);
+            if (window.api?.updateDetailViewBounds) {
+                window.api.updateDetailViewBounds(bounds).catch(error => {
+                    console.error('[PanelResize] Failed to update detail view bounds:', error);
+                    // Non-critical: detail view may be misaligned but app remains functional
+                });
+            }
+        } catch (error) {
+            console.error('[PanelResize] Error calculating detail view bounds:', error);
+        }
+
+        // Debounced persistence to localStorage
+        debouncedPersist(newLayout);
+    }, [debouncedPersist, layoutMode]);
+
+    // Browser view is always visible in the new layout
+    // History view management for tool history playback
+    useEffect(() => {
+        // Hide history view when not in history mode or when detail panel is hidden
+        if ((!showDetail || isHistoryMode) && window.api?.hideHistoryView) {
+            window.api.hideHistoryView().catch(error => {
+                console.error('[HistoryView] Failed to hide history view:', error);
+            });
+        }
+    }, [showDetail, isHistoryMode]);
+
     return (
-        <>
-            <Header />
-            <div className='bg-main-view bg-origin-padding bg-no-repeat bg-cover h-[calc(100%_-_48px)] overflow-y-auto text-text-01-dark flex'>
-                <div className='flex-1 h-full transition-all duration-300'>
-                    <div className='w-[636px] mx-auto flex flex-col gap-2 pt-7 pb-4 h-full relative'>
-                        {/* Task title and history button */}
-                        <div className='absolute top-0 left-0 w-full flex items-center justify-between'>
-                            <div className='line-clamp-1 text-xl font-semibold flex-1'>
-                                {currentTaskId && tasks.find(task => task.id === currentTaskId)?.name}
-                                {isHistoryMode && (
-                                    <span className='ml-2 text-sm text-gray-500'>{t('history_task_readonly')}</span>
-                                )}
-                            </div>
-                        </div>
-                        {/* Message list */}
-                        <div
-                            ref={scrollContainerRef}
-                            className='flex-1 h-full overflow-x-hidden overflow-y-auto px-4 pt-5'
-                            onScroll={handleScroll}
-                        >
-                            <MessageList messages={messages} onToolClick={handleToolClick} />
-                        </div>
-                        {/* Question input box */}
-                        <div className='h-30 gradient-border relative'>
-                            <Input.TextArea
-                                value={query}
-                                onKeyDown={handleKeyDown}
-                                onChange={(e) => setQuery(e.target.value)}
-                                className="!h-full !bg-tool-call !text-text-01-dark !placeholder-text-12-dark !py-2"
-                                placeholder={isHistoryMode ? t('history_readonly_input') : t('input_placeholder')}
-                                disabled={isHistoryMode}
-                            />
+        <div className="h-screen w-screen overflow-hidden flex" style={{ background: 'var(--mono-darkest)' }}>
+            {/* LEFT side: Empty space for Electron WebContentsView (browser) - only visible in split mode */}
+            {layoutMode === 'split' && (
+                <div style={{ width: `${layout.browserPanelSize}%`, flexShrink: 0 }} />
+            )}
+            
+            {/* RIGHT side: AI Sidebar - width adjusts based on layout mode */}
+            <div 
+                className="h-full flex flex-col ai-sidebar"
+                style={{ 
+                    width: layoutMode === 'split' ? `${layout.aiSidebarSize}%` : '100%',
+                    flexShrink: 0, 
+                    background: 'var(--bg-ai-sidebar)',
+                    transition: 'width 300ms ease-in-out'
+                }}
+            >
+                    {/* AI Sidebar Header - relocated header functionality */}
+                    <AISidebarHeader />
 
-                            {/* Send/Cancel button - only shown in non-history mode */}
-                            {!isHistoryMode && (
-                                <div className="absolute right-3 bottom-3">
-                                    {isCurrentTaskRunning ? (
-                                        <span 
-                                        className='bg-ask-status rounded-md flex justify-center items-center w-7 h-7 cursor-pointer'
-                                        onClick={handleCancelTask}>
-                                            <CancleTask className="w-5 h-5" />
-                                        </span>
-                                    ) : (
-                                        <span
-                                        className={`bg-ask-status rounded-md flex justify-center items-center w-7 h-7 cursor-pointer ${
-                                           query ? '' : '!cursor-not-allowed opacity-60' 
-                                        }`}
-                                        onClick={() => sendMessage(query)}>
-                                            <SendMessage className="w-5 h-5" />
-                                        </span>
+                    {/* AI Sidebar Content */}
+                    <div className="flex flex-col h-full">
+                        <div className='flex-1 h-full transition-all duration-300'>
+                            <div className='w-full max-w-[636px] mx-auto flex flex-col gap-2 pt-7 pb-4 h-full relative px-4'>
+                                {/* Task title and history button */}
+                                <div className='absolute top-0 left-4 right-4 flex items-center justify-between'>
+                                    <div className='line-clamp-1 text-xl font-semibold flex-1 text-text-01-dark'>
+                                        {currentTaskId && tasks.find(task => task.id === currentTaskId)?.name}
+                                        {isHistoryMode && (
+                                            <span className='ml-2 text-sm text-gray-500'>{t('history_task_readonly')}</span>
+                                        )}
+                                    </div>
+                                </div>
+                                
+                                {/* Message list */}
+                                <div
+                                    ref={scrollContainerRef}
+                                    className='flex-1 h-full overflow-x-hidden overflow-y-auto px-4 pt-5'
+                                    onScroll={handleScroll}
+                                >
+                                    <MessageList messages={messages} onToolClick={handleToolClick} />
+                                </div>
+                                
+                                {/* Question input box */}
+                                <div className='h-30 gradient-border relative'>
+                                    <Input.TextArea
+                                        value={query}
+                                        onKeyDown={handleKeyDown}
+                                        onChange={(e) => setQuery(e.target.value)}
+                                        className="!h-full !bg-tool-call !text-text-01-dark !placeholder-text-12-dark !py-2"
+                                        placeholder={isHistoryMode ? t('history_readonly_input') : t('input_placeholder')}
+                                        disabled={isHistoryMode}
+                                    />
+
+                                    {/* Send/Cancel button - only shown in non-history mode */}
+                                    {!isHistoryMode && (
+                                        <div className="absolute right-3 bottom-3">
+                                            {isCurrentTaskRunning ? (
+                                                <span 
+                                                className='bg-ask-status rounded-md flex justify-center items-center w-7 h-7 cursor-pointer'
+                                                onClick={handleCancelTask}>
+                                                    <CancleTask className="w-5 h-5" />
+                                                </span>
+                                            ) : (
+                                                <span
+                                                className={`bg-ask-status rounded-md flex justify-center items-center w-7 h-7 cursor-pointer ${
+                                                   query ? '' : '!cursor-not-allowed opacity-60' 
+                                                }`}
+                                                onClick={() => sendMessage(query)}>
+                                                    <SendMessage className="w-5 h-5" />
+                                                </span>
+                                            )}
+                                        </div>
                                     )}
                                 </div>
-                            )}
+                            </div>
                         </div>
+
+                        {/* Detail Panel - within AI Sidebar */}
+                        {showDetail && (
+                            <div className='h-[560px] transition-all pt-5 pb-4 pr-4 duration-300 text-text-01-dark'>
+                                <div className='h-full border-border-message border flex flex-col rounded-xl'>
+                                    {/* Detail panel title */}
+                                    <div className='p-4'>
+                                        <h3 className='text-xl font-semibold'>{t('atlas_computer')}</h3>
+                                        <div className='flex flex-col items-start justify-center px-5 py-3 gap-3 border-border-message border rounded-md h-[80px] bg-tool-call mt-3'>
+                                            {currentTool && (
+                                                <>
+                                                    <div className='border-b w-full border-dashed border-border-message flex items-center'>
+                                                        {t('atlas_using_tool')}
+                                                        <div className={`w-2 h-2 ml-2 rounded-full ${currentTool.status === 'running' ? 'bg-blue-500 animate-pulse' :
+                                                                currentTool.status === 'completed' ? 'bg-green-500' : 'bg-red-500'
+                                                            }`}></div>
+                                                        <span className='ml-1 text-xs text-text-12-dark'>
+                                                            {currentTool.status === 'running' ? t('running') :
+                                                                currentTool.status === 'completed' ? t('completed') : t('execution_error')}
+                                                        </span>
+                                                    </div>
+                                                    <h3 className='text-sm text-text-12-dark'>
+                                                        {currentTool.toolName} - {currentTool.operation}
+                                                    </h3>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Detail panel content area - WebContentsView positioning managed by Electron */}
+                                    <div className='p-4 pt-0 flex-1'>
+                                        <div className='border-border-message border rounded-md h-full flex flex-col'>
+                                            <div className='h-[42px] bg-tool-call rounded-md flex items-center justify-center p-2'>
+                                                {currentUrl && (
+                                                    <div className='text-xs text-text-12-dark line-clamp-1'>
+                                                        {currentUrl}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className='flex-1'></div>
+                                            <div className='h-[42px] bg-tool-call rounded-md flex items-center px-3'>
+                                                {/* Tool call progress bar */}
+                                                {toolHistory.length > 0 && (
+                                                    <div className='flex-1 flex items-center gap-2'>
+                                                        {/* Forward/Backward button group */}
+                                                        <div className='flex items-center border border-border-message rounded'>
+                                                            <Button
+                                                                type="text"
+                                                                size="small"
+                                                                disabled={toolHistory.length === 0 || (currentHistoryIndex === 0)}
+                                                                onClick={() => {
+                                                                    const newIndex = currentHistoryIndex === -1 ? toolHistory.length - 2 : currentHistoryIndex - 1;
+                                                                    switchToHistoryIndex(Math.max(0, newIndex));
+                                                                }}
+                                                                className='!border-0 !rounded-r-none'
+                                                            >
+                                                                <StepUpDown className='w-3 h-3' />
+                                                            </Button>
+                                                            <Button
+                                                                type="text"
+                                                                size="small"
+                                                                disabled={currentHistoryIndex === -1}
+                                                                onClick={() => switchToHistoryIndex(currentHistoryIndex + 1)}
+                                                                className='!border-0 !rounded-l-none border-l border-border-message'
+                                                            >
+                                                                <StepUpDown className='rotate-180 w-3 h-3' />
+                                                            </Button>
+                                                        </div>
+
+                                                        <Slider
+                                                            className='flex-1'
+                                                            min={0}
+                                                            max={toolHistory.length}
+                                                            value={currentHistoryIndex === -1 ? toolHistory.length : currentHistoryIndex + 1}
+                                                            onChange={(value) => switchToHistoryIndex(value - 1)}
+                                                            step={1}
+                                                            marks={toolHistory.reduce((marks, _, index) => {
+                                                                marks[index + 1] = '';
+                                                                return marks;
+                                                            }, {} as Record<number, string>)}
+                                                        />
+
+                                                        <span className='text-xs text-text-12-dark'>
+                                                            {t('realtime')}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
-
-                </div>
-                <div className='h-full transition-all pt-5 pb-4 pr-4 duration-300 text-text-01-dark' style={{ width: showDetail ? '800px' : '0px' }}>
-                    {showDetail && (
-                        <div className='h-full border-border-message border flex flex-col rounded-xl'>
-                            {/* Detail panel title */}
-                            <div className='p-4'>
-                                <h3 className='text-xl font-semibold'>{t('atlas_computer')}</h3>
-                                <div className='flex flex-col items-start justify-centerce px-5 py-3 gap-3 border-border-message border rounded-md h-[80px] bg-tool-call mt-3'>
-                                    {currentTool && (
-                                        <>
-                                            <div className='border-b w-full border-dashed border-border-message flex items-center'>
-                                                {t('atlas_using_tool')}
-                                                <div className={`w-2 h-2 ml-2 rounded-full ${currentTool.status === 'running' ? 'bg-blue-500 animate-pulse' :
-                                                        currentTool.status === 'completed' ? 'bg-green-500' : 'bg-red-500'
-                                                    }`}></div>
-                                                <span className='ml-1 text-xs text-text-12-dark'>
-                                                    {currentTool.status === 'running' ? t('running') :
-                                                        currentTool.status === 'completed' ? t('completed') : t('execution_error')}
-                                                </span>
-
-                                            </div>
-                                            <h3 className='text-sm text-text-12-dark'>
-                                                {currentTool.toolName} - {currentTool.operation}
-                                            </h3>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Detail panel content area - reserved space */}
-                            <div className='p-4 pt-0 flex-1 '>
-                                <div className='border-border-message border rounded-md h-full flex flex-col'>
-                                    <div className='h-[42px] bg-tool-call rounded-md flex items-center justify-center p-2'>
-                                        {currentUrl && (
-                                            <div className='text-xs text-text-12-dark line-clamp-1'>
-                                                {currentUrl}
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div className='flex-1'></div>
-                                    <div className='h-[42px] bg-tool-call rounded-md flex items-center px-3'>
-                                        {/* Tool call progress bar */}
-                                        {toolHistory.length > 0 && (
-                                            <div className='flex-1 flex items-center gap-2'>
-                                                {/* Forward/Backward button group */}
-                                                <div className='flex items-center border border-border-message rounded'>
-                                                    <Button
-                                                        type="text"
-                                                        size="small"
-                                                        disabled={toolHistory.length === 0 || (currentHistoryIndex === 0)}
-                                                        onClick={() => {
-                                                            const newIndex = currentHistoryIndex === -1 ? toolHistory.length - 2 : currentHistoryIndex - 1;
-                                                            switchToHistoryIndex(Math.max(0, newIndex));
-                                                        }}
-                                                        className='!border-0 !rounded-r-none'
-                                                    >
-                                                        <StepUpDown className='w-3 h-3' />
-                                                    </Button>
-                                                    <Button
-                                                        type="text"
-                                                        size="small"
-                                                        disabled={currentHistoryIndex === -1}
-                                                        onClick={() => switchToHistoryIndex(currentHistoryIndex + 1)}
-                                                        className='!border-0 !rounded-l-none border-l border-border-message'
-                                                    >
-                                                        <StepUpDown className='rotate-180 w-3 h-3' />
-                                                    </Button>
-                                                </div>
-
-                                                <Slider
-                                                    className='flex-1'
-                                                    min={0}
-                                                    max={toolHistory.length}
-                                                    value={currentHistoryIndex === -1 ? toolHistory.length : currentHistoryIndex + 1}
-                                                    onChange={(value) => switchToHistoryIndex(value - 1)}
-                                                    step={1}
-                                                    marks={toolHistory.reduce((marks, _, index) => {
-                                                        marks[index + 1] = '';
-                                                        return marks;
-                                                    }, {} as Record<number, string>)}
-                                                />
-
-                                                <span className='text-xs text-text-12-dark'>
-                                                    {t('realtime')}
-                                                </span>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
             </div>
-
-        </>
+        </div>
     )
 }
