@@ -4,6 +4,22 @@ import type { EkoResult } from "@jarvis-agent/core/types";
 import { BrowserWindow, WebContentsView, app } from "electron";
 import path from "node:path";
 import { ConfigManager } from "../utils/config-manager";
+// Phase 1, 2 & 3: Import browser tools
+import {
+  browserGetMarkdownTool,
+  browserReadLinksTool,
+  browserGoForwardTool,
+  browserGetTextTool,
+  browserPressKeyTool,
+  browserScrollTool,
+  // Phase 2: Tab management tools
+  browserNewTabTool,
+  browserCloseTabTool,
+  browserSwitchTabTool,
+  // Phase 3: Core interaction tools
+  browserPasteTextTool,
+  browserWaitForElementTool
+} from "./browser-tools";
 
 export class EkoService {
   private eko: Eko | null = null;
@@ -104,14 +120,36 @@ export class EkoService {
     this.agents = [];
 
     if (agentConfig.browserAgent.enabled) {
-      this.agents.push(
-        new BrowserAgent(
-          this.detailView,
-          this.mcpClient,
-          agentConfig.browserAgent.customPrompt
-        )
+      // Create browser agent
+      const browserAgent = new BrowserAgent(
+        this.detailView,
+        this.mcpClient,
+        agentConfig.browserAgent.customPrompt
       );
+
+      // Phase 1: Register advanced browser tools
+      // These tools extend the existing BrowserAgent with additional capabilities
+      browserAgent.addTool(browserGetMarkdownTool);
+      browserAgent.addTool(browserReadLinksTool);
+      browserAgent.addTool(browserGoForwardTool);
+      browserAgent.addTool(browserGetTextTool);
+      browserAgent.addTool(browserPressKeyTool);
+      browserAgent.addTool(browserScrollTool);
+
+      // Phase 2: Register tab management tools
+      browserAgent.addTool(browserNewTabTool);
+      browserAgent.addTool(browserCloseTabTool);
+      browserAgent.addTool(browserSwitchTabTool);
+
+      // Phase 3: Register core interaction tools
+      browserAgent.addTool(browserPasteTextTool);
+      browserAgent.addTool(browserWaitForElementTool);
+
+      this.agents.push(browserAgent);
       Log.info('BrowserAgent enabled with custom prompt:', agentConfig.browserAgent.customPrompt ? 'Yes' : 'No');
+      Log.info('Phase 1 browser tools registered: 6 advanced tools added');
+      Log.info('Phase 2 browser tools registered: 3 tab management tools added');
+      Log.info('Phase 3 browser tools registered: 2 core interaction tools added');
     }
 
     if (agentConfig.fileAgent.enabled) {
