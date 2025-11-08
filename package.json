@@ -18,7 +18,7 @@
     "build": "npm run build:next && npm run build:deps && npm run build:electron",
     "build:win": "npm run build:next && npm run build:deps:win && npm run build:electron",
     "build:next-only": "next build",
-    "build:deps:watch": "concurrently \"vite build --config electron/preload/vite.config.ts --watch\" \"vite build --config electron/main/vite.config.ts --watch\"",
+    "build:deps:watch": "concurrently \"ENTRY=index vite build --config electron/preload/vite.config.ts --watch\" \"ENTRY=view vite build --config electron/preload/vite.config.ts --watch\" \"vite build --config electron/main/vite.config.ts --watch\"",
     "build:deps:watch:win": "concurrently \"set ENTRY=index&& vite build --config electron/preload/vite.config.ts --watch\" \"set ENTRY=view&& vite build --config electron/preload/vite.config.ts --watch\" \"vite build --config electron/main/vite.config.ts --watch\"",
     "dev:win": "concurrently \"next dev -p 5173\" \"npm run build:deps:watch:win\" \"nodemon --exec electron ./dist/electron/main/index.mjs --watch electron\"",
     "test": "jest",

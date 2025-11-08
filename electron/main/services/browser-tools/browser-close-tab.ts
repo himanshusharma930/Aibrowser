@@ -10,7 +10,8 @@
  * @phase 2
  */
 
-import { Tool, AgentContext, ToolResult } from '@jarvis-agent/core';
+import { AgentContext } from '@jarvis-agent/core';
+import type { Tool, ToolResult } from '@jarvis-agent/core/types';
 
 export const browserCloseTabTool: Tool = {
   name: 'browser_close_tab',

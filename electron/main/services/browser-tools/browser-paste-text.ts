@@ -10,7 +10,8 @@
  * @risk LOW
  */
 
-import { Tool, AgentContext, ToolResult } from '@jarvis-agent/core';
+import { AgentContext } from '@jarvis-agent/core';
+import type { Tool, ToolResult } from '@jarvis-agent/core/types';
 
 interface BrowserPasteTextArgs {
   selector: string;
