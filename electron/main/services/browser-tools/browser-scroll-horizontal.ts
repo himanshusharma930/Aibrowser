@@ -22,7 +22,7 @@ interface BrowserScrollHorizontalArgs {
 
 export const browserScrollHorizontalTool: Tool = {
   name: 'browser_scroll_horizontal',
-  description: 'Scroll horizontally on page or element. Direction: "left" or "right". Amount in pixels (default: 100). Optionally target specific element with selector.',
+  description: 'Scroll left/right. Amount in pixels (default: 100).',
   parameters: {
     type: 'object',
     properties: {

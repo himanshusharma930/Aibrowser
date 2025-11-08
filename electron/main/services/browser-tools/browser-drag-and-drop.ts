@@ -27,7 +27,7 @@ interface BrowserDragAndDropArgs {
 
 export const browserDragAndDropTool: Tool = {
   name: 'browser_drag_and_drop',
-  description: 'Drag and drop from one location to another. Can drag from/to elements (selector) or coordinates (x, y). Supports canvas dragging, chart manipulation, and file drag operations.',
+  description: 'Drag and drop between elements or coordinates. For canvas/charts.',
   parameters: {
     type: 'object',
     properties: {

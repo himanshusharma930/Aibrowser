@@ -22,7 +22,7 @@ interface BrowserSetZoomArgs {
 
 export const browserSetZoomTool: Tool = {
   name: 'browser_set_zoom',
-  description: 'Set browser zoom level. Use zoom (0.25-5.0), zoomFactor (25%-500%), or action (in/out/reset). Step controls zoom increment (default: 0.1).',
+  description: 'Set zoom level (0.25-5.0) or use action: in/out/reset.',
   parameters: {
     type: 'object',
     properties: {

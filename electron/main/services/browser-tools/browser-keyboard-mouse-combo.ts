@@ -26,7 +26,7 @@ interface BrowserKeyboardMouseComboArgs {
 
 export const browserKeyboardMouseComboTool: Tool = {
   name: 'browser_keyboard_mouse_combo',
-  description: 'Perform mouse action with keyboard modifiers held. Action: click/scroll/drag/hover/wheel. Modifiers: ctrl, alt, shift, meta (Cmd on Mac). Example: Ctrl+click, Shift+drag, Alt+scroll.',
+  description: 'Mouse action with modifiers (ctrl/alt/shift/meta). Actions: click/scroll/drag/hover.',
   parameters: {
     type: 'object',
     properties: {

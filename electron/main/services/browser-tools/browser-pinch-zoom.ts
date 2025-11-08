@@ -24,7 +24,7 @@ interface BrowserPinchZoomArgs {
 
 export const browserPinchZoomTool: Tool = {
   name: 'browser_pinch_zoom',
-  description: 'Simulate pinch-to-zoom gesture on an element or coordinates. Use for canvas, maps, charts. Direction: "in" to zoom in (default scale 1.5), "out" to zoom out (scale 0.5), or specify custom scale.',
+  description: 'Pinch zoom gesture. Direction: in/out, or custom scale.',
   parameters: {
     type: 'object',
     properties: {
