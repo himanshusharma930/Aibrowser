@@ -72,8 +72,7 @@ export const browserPinchZoomTool: Tool = {
 
       const steps = args.steps || 10;
 
-      const result = await (agentContext.agent as any).execute_script(
-        agentContext,
+      const result = await agentContext.agent.execute_script(
         agentContext,
         (
           selector: string | undefined,

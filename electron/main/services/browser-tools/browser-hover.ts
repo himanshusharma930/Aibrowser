@@ -50,8 +50,7 @@ export const browserHoverTool: Tool = {
         };
       }
 
-      const result = await (agentContext.agent as any).execute_script(agentContext, 
-        agentContext,
+      const result = await agentContext.agent.execute_script(agentContext,
         (index: number | undefined, selector: string | undefined) => {
           let element: Element | null = null;
 

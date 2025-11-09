@@ -55,8 +55,7 @@ export const browserScrollHorizontalTool: Tool = {
       const amount = args.amount || 100;
       const smooth = args.smooth !== false; // default true
 
-      const result = await (agentContext.agent as any).execute_script(
-        agentContext,
+      const result = await agentContext.agent.execute_script(
         agentContext,
         (
           direction: string,

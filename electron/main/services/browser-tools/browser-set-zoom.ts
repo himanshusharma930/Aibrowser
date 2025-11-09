@@ -51,7 +51,7 @@ export const browserSetZoomTool: Tool = {
     agentContext: AgentContext
   ): Promise<ToolResult> => {
     try {
-      const view = (agentContext.agent as any).view;
+      const view = (agentContext.agent as any).detailView;
       if (!view || !view.webContents) {
         return {
           content: [{

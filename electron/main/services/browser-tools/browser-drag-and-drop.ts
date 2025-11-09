@@ -79,8 +79,7 @@ export const browserDragAndDropTool: Tool = {
       const offsetX = args.offsetX || 0;
       const offsetY = args.offsetY || 0;
 
-      const result = await (agentContext.agent as any).execute_script(
-        agentContext,
+      const result = await agentContext.agent.execute_script(
         agentContext,
         (
           fromSelector: string | undefined,

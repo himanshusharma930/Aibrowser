@@ -81,8 +81,7 @@ export const browserKeyboardMouseComboTool: Tool = {
       const deltaX = args.deltaX || 0;
       const deltaY = args.deltaY || 0;
 
-      const result = await (agentContext.agent as any).execute_script(
-        agentContext,
+      const result = await agentContext.agent.execute_script(
         agentContext,
         (
           action: string,
