@@ -1,7 +1,12 @@
 /**
  * Enhanced RightAISidebar Component
  *
- * AI assistant sidebar with conversation area, sticky input box, and suggestion chips.
+ * AI assistant sidebar with:
+ * - Sticky header that stays visible while scrolling
+ * - Professional typography hierarchy
+ * - Sticky input box at bottom for always-accessible conversation
+ * - Enhanced UX with smooth scrolling and visual feedback
+ * - Accessibility features (keyboard navigation, focus management)
  */
 
 import React, { useRef, useEffect, useState } from 'react';
@@ -39,10 +44,12 @@ export const EnhancedRightAISidebar: React.FC<EnhancedRightAISidebarProps> = ({
   className
 }) => {
   const conversationEndRef = useRef<HTMLDivElement>(null);
+  const conversationContainerRef = useRef<HTMLDivElement>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
 
   /**
    * Auto-scroll to bottom when new messages arrive
+   * Uses smooth scrolling behavior for better UX
    */
   useEffect(() => {
     if (isAtBottom && conversationEndRef.current) {
@@ -52,6 +59,7 @@ export const EnhancedRightAISidebar: React.FC<EnhancedRightAISidebarProps> = ({
 
   /**
    * Handle scroll to detect if user is at bottom
+   * Threshold: 50px from bottom
    */
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const target = e.currentTarget;
@@ -60,18 +68,33 @@ export const EnhancedRightAISidebar: React.FC<EnhancedRightAISidebarProps> = ({
     setIsAtBottom(isNearBottom);
   };
 
+  /**
+   * Scroll to bottom programmatically
+   */
+  const scrollToBottom = () => {
+    if (conversationEndRef.current) {
+      conversationEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      setIsAtBottom(true);
+    }
+  };
+
   return (
     <div className={`${styles.rightAISidebar} ${className || ''}`}>
-      {/* Header */}
-      <AISidebarHeader
-        onClear={onClear}
-        onMinimize={onMinimize}
-      />
+      {/* Sticky Header - Stays visible on scroll */}
+      <div className={styles.sidebarHeader}>
+        <AISidebarHeader
+          onClear={onClear}
+          onMinimize={onMinimize}
+        />
+      </div>
 
       {/* Conversation Area (scrollable) */}
       <div
+        ref={conversationContainerRef}
         className={styles.conversationContainer}
         onScroll={handleScroll}
+        role="log"
+        aria-label="Conversation messages"
       >
         <ConversationArea
           messages={messages}
@@ -80,14 +103,14 @@ export const EnhancedRightAISidebar: React.FC<EnhancedRightAISidebarProps> = ({
         <div ref={conversationEndRef} />
       </div>
 
-      {/* Suggestion Chips */}
+      {/* Suggestion Chips - Between scroll and input */}
       <div className={styles.suggestionsContainer}>
         <SuggestionChips
           onSuggestionClick={onSuggestionClick}
         />
       </div>
 
-      {/* Sticky Input Box */}
+      {/* Sticky Input Box - Always visible at bottom */}
       <div className={styles.inputContainer}>
         <StickyInputBox
           onSendMessage={onSendMessage}
@@ -99,11 +122,9 @@ export const EnhancedRightAISidebar: React.FC<EnhancedRightAISidebarProps> = ({
       {!isAtBottom && messages.length > 0 && (
         <button
           className={styles.scrollToBottomButton}
-          onClick={() => {
-            conversationEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-            setIsAtBottom(true);
-          }}
-          aria-label="Scroll to bottom"
+          onClick={scrollToBottom}
+          aria-label="Scroll to latest message"
+          title="Jump to latest message"
         >
           ↓
         </button>
