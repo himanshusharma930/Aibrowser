@@ -322,3 +322,13 @@ export default function ToolboxPage() {
     </div>
   );
 }
+
+/**
+ * Static props generation for SSG compatibility
+ * This ensures the page can be pre-rendered at build time
+ */
+export async function getStaticProps() {
+  return {
+    props: {},
+  };
+}
