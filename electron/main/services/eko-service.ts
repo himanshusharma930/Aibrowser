@@ -4,6 +4,59 @@ import type { EkoResult } from "@jarvis-agent/core/types";
 import { BrowserWindow, WebContentsView, app } from "electron";
 import path from "node:path";
 import { ConfigManager } from "../utils/config-manager";
+// Phase 1, 2 & 3: Import browser tools
+import {
+  browserGetMarkdownTool,
+  browserReadLinksTool,
+  browserGoForwardTool,
+  browserGetTextTool,
+  browserPressKeyTool,
+  browserScrollTool,
+  // Phase 2: Tab management tools
+  browserNewTabTool,
+  browserCloseTabTool,
+  browserSwitchTabTool,
+  // Phase 3: Core interaction tools
+  browserPasteTextTool,
+  browserWaitForElementTool,
+  // Phase 5: Advanced gesture tools
+  browserDragAndDropTool,
+  browserSetZoomTool,
+  browserPinchZoomTool,
+  browserKeyboardMouseComboTool,
+  browserScrollHorizontalTool
+} from "./browser-tools";
+
+// Phase 4: Import advanced browser tools
+import {
+  // Element extraction tools (7 tools)
+  extractElementStylesTool,
+  extractElementStructureTool,
+  extractElementEventsTool,
+  extractElementAnimationsTool,
+  extractElementAssetsTool,
+  extractRelatedFilesTool,
+  cloneElementCompleteTool,
+  // JavaScript function management tools (9 tools)
+  discoverGlobalFunctionsTool,
+  discoverObjectMethodsTool,
+  callJavaScriptFunctionTool,
+  inspectFunctionSignatureTool,
+  createPersistentFunctionTool,
+  injectAndExecuteScriptTool,
+  executeFunctionSequenceTool,
+  getExecutionContextsTool,
+  getFunctionExecutorInfoTool,
+  // CDP command tools (2 tools)
+  executeCdpCommandTool,
+  listCdpCommandsTool,
+  // CDP extraction tools (2 tools)
+  extractElementStylesCdpTool,
+  extractCompleteElementCdpTool,
+  // File operations tools (2 tools)
+  cloneElementToFileTool,
+  extractCompleteElementToFileTool
+} from "./advanced-browser-tools";
 
 export class EkoService {
   private eko: Eko | null = null;
@@ -103,15 +156,95 @@ export class EkoService {
     // Create agents with custom prompts
     this.agents = [];
 
+    // Feature flag: Enable advanced tools (set to false if your API has payload size limits)
+    const ENABLE_ADVANCED_TOOLS = true;  // Set to true to enable Phase 4 tools (22 additional tools)
+    const ENABLE_GESTURE_TOOLS = true;   // Gesture tools are lightweight, can stay enabled
+
     if (agentConfig.browserAgent.enabled) {
-      this.agents.push(
-        new BrowserAgent(
-          this.detailView,
-          this.mcpClient,
-          agentConfig.browserAgent.customPrompt
-        )
+      // Create browser agent
+      const browserAgent = new BrowserAgent(
+        this.detailView,
+        this.mcpClient,
+        agentConfig.browserAgent.customPrompt
       );
+
+      // Phase 1: Register advanced browser tools
+      // These tools extend the existing BrowserAgent with additional capabilities
+      browserAgent.addTool(browserGetMarkdownTool);
+      browserAgent.addTool(browserReadLinksTool);
+      browserAgent.addTool(browserGoForwardTool);
+      browserAgent.addTool(browserGetTextTool);
+      browserAgent.addTool(browserPressKeyTool);
+      browserAgent.addTool(browserScrollTool);
+
+      // Phase 2: Register tab management tools
+      browserAgent.addTool(browserNewTabTool);
+      browserAgent.addTool(browserCloseTabTool);
+      browserAgent.addTool(browserSwitchTabTool);
+
+      // Phase 3: Register core interaction tools
+      browserAgent.addTool(browserPasteTextTool);
+      browserAgent.addTool(browserWaitForElementTool);
+
+      // Phase 4: Register advanced browser tools (conditional)
+      if (ENABLE_ADVANCED_TOOLS) {
+        // Element extraction tools (7 tools)
+        browserAgent.addTool(extractElementStylesTool);
+        browserAgent.addTool(extractElementStructureTool);
+        browserAgent.addTool(extractElementEventsTool);
+        browserAgent.addTool(extractElementAnimationsTool);
+        browserAgent.addTool(extractElementAssetsTool);
+        browserAgent.addTool(extractRelatedFilesTool);
+        browserAgent.addTool(cloneElementCompleteTool);
+
+        // JavaScript function management tools (9 tools)
+        browserAgent.addTool(discoverGlobalFunctionsTool);
+        browserAgent.addTool(discoverObjectMethodsTool);
+        browserAgent.addTool(callJavaScriptFunctionTool);
+        browserAgent.addTool(inspectFunctionSignatureTool);
+        browserAgent.addTool(createPersistentFunctionTool);
+        browserAgent.addTool(injectAndExecuteScriptTool);
+        browserAgent.addTool(executeFunctionSequenceTool);
+        browserAgent.addTool(getExecutionContextsTool);
+        browserAgent.addTool(getFunctionExecutorInfoTool);
+
+        // CDP command tools (2 tools)
+        browserAgent.addTool(executeCdpCommandTool);
+        browserAgent.addTool(listCdpCommandsTool);
+
+        // CDP extraction tools (2 tools)
+        browserAgent.addTool(extractElementStylesCdpTool);
+        browserAgent.addTool(extractCompleteElementCdpTool);
+
+        // File operations tools (2 tools)
+        browserAgent.addTool(cloneElementToFileTool);
+        browserAgent.addTool(extractCompleteElementToFileTool);
+      }
+
+      // Phase 5: Register advanced gesture tools (conditional)
+      if (ENABLE_GESTURE_TOOLS) {
+        browserAgent.addTool(browserDragAndDropTool);
+        browserAgent.addTool(browserSetZoomTool);
+        browserAgent.addTool(browserPinchZoomTool);
+        browserAgent.addTool(browserKeyboardMouseComboTool);
+        browserAgent.addTool(browserScrollHorizontalTool);
+      }
+
+      this.agents.push(browserAgent);
       Log.info('BrowserAgent enabled with custom prompt:', agentConfig.browserAgent.customPrompt ? 'Yes' : 'No');
+      Log.info('Phase 1 browser tools registered: 6 advanced tools added');
+      Log.info('Phase 2 browser tools registered: 3 tab management tools added');
+      Log.info('Phase 3 browser tools registered: 2 core interaction tools added');
+      if (ENABLE_ADVANCED_TOOLS) {
+        Log.info('Phase 4 advanced browser tools registered: 22 tools added (7 element extraction + 9 JS functions + 2 CDP commands + 2 CDP extraction + 2 file operations)');
+      } else {
+        Log.info('Phase 4 advanced browser tools: DISABLED (enable via ENABLE_ADVANCED_TOOLS flag)');
+      }
+      if (ENABLE_GESTURE_TOOLS) {
+        Log.info('Phase 5 gesture tools registered: 5 tools added (drag-drop, zoom, pinch-zoom, keyboard-mouse-combo, horizontal-scroll)');
+      } else {
+        Log.info('Phase 5 gesture tools: DISABLED (enable via ENABLE_GESTURE_TOOLS flag)');
+      }
     }
 
     if (agentConfig.fileAgent.enabled) {

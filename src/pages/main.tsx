@@ -1,20 +1,35 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/router'
-import Header from '@/components/Header'
-import { Input, Slider, Button, App } from 'antd'
+import { PanelGroup, Panel, PanelResizeHandle } from 'react-resizable-panels'
+import AISidebarHeader from '@/components/AISidebarHeader'
+import { BrowserPanel } from '@/components/BrowserPanel'
+import { BrowserArea } from '@/components/BrowserArea'
+import RoundedContainer from '@/components/RoundedContainer'
+import { Input, Button, App } from 'antd'
 import { EkoResult, StreamCallbackMessage } from '@jarvis-agent/core/dist/types';
 import { MessageList } from '@/components/chat/MessageComponents';
 import { uuidv4 } from '@/common/utils';
-import { StepUpDown, SendMessage, CancleTask } from '@/icons/deepfundai-icons';
+import { SendMessage, CancleTask } from '@/icons/deepfundai-icons';
 import { Task, ToolAction } from '@/models';
+import { CurrentToolState } from '@/types/tool';
+import { DETAIL_PANEL_AGENTS } from '@/constants/agents';
 import { MessageProcessor } from '@/utils/messageTransform';
 import { useTaskManager } from '@/hooks/useTaskManager';
 import { useHistoryStore } from '@/stores/historyStore';
 import { scheduledTaskStorage } from '@/lib/scheduled-task-storage';
 import { useTranslation } from 'react-i18next';
+import { loadPersistedLayout, createDebouncedPersist, clampPanelSize } from '@/utils/panel-layout-storage';
+import { calculateDetailViewBounds, validateBounds } from '@/utils/detail-view-bounds';
+import { optimizedSplitLayoutTransition, createDebouncedBoundsUpdate } from '@/utils/layout-transition';
+import { PanelLayoutState, DetailViewBounds } from '@/type';
+import { useLayoutMode } from '@/hooks/useLayoutMode';
+import { useEkoEvents } from '@/hooks/useEkoEvents';
+import { useWindowApi } from '@/hooks/useWindowApi';
+import { useEkoStreamHandler } from '@/hooks/useEkoStreamHandler';
+// Resize handle styles are now in globals.css
 
 
-export default function main() {
+export default function Main() {
     const { t } = useTranslation('main');
     const { message: antdMessage } = App.useApp();
     const router = useRouter();
@@ -47,20 +62,31 @@ export default function main() {
     const [showDetail, setShowDetail] = useState(false);
     const [query, setQuery] = useState('');
     const [currentUrl, setCurrentUrl] = useState<string>('');
+    // Navigation state for browser controls
+    const [canGoBack, setCanGoBack] = useState(false);
+    const [canGoForward, setCanGoForward] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
     // Current tool information state
-    const [currentTool, setCurrentTool] = useState<{
-        toolName: string;
-        operation: string;
-        status: 'running' | 'completed' | 'error';
-    } | null>(null);
+    const [currentTool, setCurrentTool] = useState<CurrentToolState | null>(null);
     // Tool call history
     const [toolHistory, setToolHistory] = useState<(ToolAction & { screenshot?: string, toolSequence?: number })[]>([]);
     // Current displayed history tool index, -1 means showing the latest detail panel
     const [currentHistoryIndex, setCurrentHistoryIndex] = useState<number>(-1);
 
-    const showDetailAgents = ['Browser', 'File'];
-
     const [ekoRequest, setEkoRequest] = useState<Promise<any> | null>(null)
+
+    // Panel layout state management
+    const [layout, setLayout] = useState<PanelLayoutState>(() => loadPersistedLayout())
+    const debouncedPersist = useMemo(() => createDebouncedPersist(500), [])
+    
+    // Requirement 8.2: Optimized debounced bounds update using requestAnimationFrame
+    // Creates a debounced version that batches DOM operations to avoid layout thrashing
+    const debouncedUpdateBounds = useMemo(() => createDebouncedBoundsUpdate(16), [])
+
+    // Layout mode management (full-width vs split)
+    // In scheduled task detail mode, always use split layout
+    const { layoutMode: hookLayoutMode, transitionToSplitLayout, isFirstMessage } = useLayoutMode()
+    const layoutMode = isTaskDetailMode ? 'split' : hookLayoutMode
 
     // Check if current task is running
     const isCurrentTaskRunning = useMemo(() => {
@@ -87,59 +113,264 @@ export default function main() {
         taskIdRef.current = currentTaskId;
     }, [currentTaskId]);
 
-    // Monitor detail panel display status changes, synchronize control of detail view
-    useEffect(() => {
-        if (window.api && (window.api as any).setDetailViewVisible) {
-            const showDetailView = isHistoryMode ? false : showDetail;
-            (window.api as any).setDetailViewVisible(showDetailView);
-        }
-
-        // When detail panel is hidden, also close history screenshot preview view
-        if (!showDetail && window.api && (window.api as any).hideHistoryView) {
-            (window.api as any).hideHistoryView();
-        }
-    }, [showDetail]);
+    // NOTE: Browser view visibility is now managed separately - it's always visible
+    // The old showDetail state was for browser automation overlay, not the main browser view
 
     // Cleanup logic when page is destroyed
     useEffect(() => {
         return () => {
             console.log('Main page unloaded, performing cleanup');
             if (window.api) {
+                // Requirement 7.3: Handle layout transition failures gracefully during cleanup
                 // Close detail view
                 if ((window.api as any).setDetailViewVisible) {
-                    (window.api as any).setDetailViewVisible(false);
+                    try {
+                        (window.api as any).setDetailViewVisible(false);
+                    } catch (error) {
+                        console.error('[Cleanup] Failed to hide detail view:', error);
+                        // Non-blocking - page is unloading anyway
+                    }
                 }
                 // Close history screenshot preview view
                 if ((window.api as any).hideHistoryView) {
-                    (window.api as any).hideHistoryView();
+                    try {
+                        (window.api as any).hideHistoryView();
+                    } catch (error) {
+                        console.error('[Cleanup] Failed to hide history view:', error);
+                        // Non-blocking - page is unloading anyway
+                    }
                 }
                 // Terminate current task
                 if ((window.api as any).ekoCancelTask && taskIdRef.current) {
-                    window.api.ekoCancelTask(taskIdRef.current);
+                    try {
+                        window.api.ekoCancelTask(taskIdRef.current);
+                    } catch (error) {
+                        console.error('[Cleanup] Failed to cancel task:', error);
+                        // Non-blocking - page is unloading anyway
+                    }
                 }
             }
         };
     }, []); // Empty dependency array, only executes on component mount/unmount
 
+    // Coordinate WebContentsView visibility with layout mode
+    // Requirement 6.5: Update WebContentsView visibility based on layout mode
+    useEffect(() => {
+        const updateViewVisibility = async () => {
+            try {
+                if (window.api?.view?.setDetailViewVisible) {
+                    // Show WebContentsView only when layoutMode === 'split'
+                    // Hide WebContentsView when layoutMode === 'full-width'
+                    const shouldBeVisible = layoutMode === 'split';
+                    await window.api.view.setDetailViewVisible(shouldBeVisible);
+                    console.log('[LayoutMode] WebContentsView visibility updated:', shouldBeVisible);
+                }
+            } catch (error) {
+                console.error('[LayoutMode] Failed to update WebContentsView visibility:', error);
+                // Non-blocking - visibility update failed but layout mode changed
+            }
+        };
+        
+        updateViewVisibility();
+    }, [layoutMode]); // Re-run when layout mode changes
+
+    // Update browser view bounds when layout mode changes
+    // Requirement 8.2: Use optimized bounds update with requestAnimationFrame
+    useEffect(() => {
+        // Only update bounds when in split mode (browser area is visible)
+        if (layoutMode !== 'split') {
+            return;
+        }
+        
+        // Requirement 7.3: Handle layout transition failures gracefully
+        const updateBounds = async () => {
+            try {
+                const bounds = calculateDetailViewBounds(
+                    window.innerWidth, 
+                    layout.browserPanelSize, 
+                    window.innerHeight, 
+                    layoutMode,
+                    48, // tabBarHeight
+                    16  // windowMargins
+                );
+                // Use debounced update with requestAnimationFrame for smooth transitions
+                await debouncedUpdateBounds(bounds);
+                console.log('[LayoutMode] Browser view bounds updated for layout mode:', layoutMode);
+            } catch (error) {
+                // Requirement 7.3: Log error, keep current layout
+                console.error('[LayoutMode] Failed to update browser view bounds:', error);
+                // Don't show user notification - this is a background operation
+                // Browser view will keep its current bounds until next successful update
+            }
+        };
+        
+        updateBounds();
+    }, [layoutMode, layout.browserPanelSize, debouncedUpdateBounds]); // Re-run when layout mode or browser panel size changes
+
+    // Handle window resize to update WebContentsView bounds
+    // Requirement 8.2: Use optimized bounds update with requestAnimationFrame
+    useEffect(() => {
+        const handleWindowResize = async () => {
+            try {
+                const bounds = calculateDetailViewBounds(
+                    window.innerWidth,
+                    layout.browserPanelSize,
+                    window.innerHeight,
+                    layoutMode,
+                    48, // tabBarHeight
+                    16  // windowMargins
+                );
+                // Debounced update with requestAnimationFrame batching
+                await debouncedUpdateBounds(bounds);
+            } catch (error) {
+                console.error('[WindowResize] Error calculating detail view bounds:', error);
+            }
+        };
+
+        window.addEventListener('resize', handleWindowResize);
+
+        return () => {
+            window.removeEventListener('resize', handleWindowResize);
+        };
+    }, [layout.browserPanelSize, layoutMode, debouncedUpdateBounds]);
+
+    // In scheduled task detail mode, ensure browser view is visible
+    useEffect(() => {
+        if (isTaskDetailMode && window.api?.setDetailViewVisible) {
+            // Requirement 7.3: Handle layout transition failures gracefully
+            window.api.setDetailViewVisible(true).catch(error => {
+                console.error('[ScheduledTask] Failed to show browser view:', error);
+                // Show non-blocking warning message
+                antdMessage.warning(t('layout_transition_failed') || 'Layout transition failed, but continuing...');
+                // Keep current layout - user can still view task details in AI panel
+            });
+        }
+    }, [isTaskDetailMode, antdMessage, t]);
+
+    // Use window API hook for type-safe access to Electron APIs
+    const { getCurrentUrl, onUrlChange } = useWindowApi();
+
     // Get current URL and monitor URL changes on initialization
     useEffect(() => {
         const initUrl = async () => {
-            if (window.api && (window.api as any).getCurrentUrl) {
-                const url = await (window.api as any).getCurrentUrl();
-                setCurrentUrl(url);
+            const url = await getCurrentUrl();
+            setCurrentUrl(url);
+            
+            // Also get initial navigation state
+            if (window.api?.view?.getNavigationState) {
+                try {
+                    const navState = await window.api.view.getNavigationState();
+                    setCanGoBack(navState.canGoBack);
+                    setCanGoForward(navState.canGoForward);
+                } catch (error) {
+                    console.error('[Navigation] Failed to get initial navigation state:', error);
+                }
             }
         };
 
         // Monitor URL changes
-        if (window.api && (window.api as any).onUrlChange) {
-            (window.api as any).onUrlChange((url: string) => {
-                setCurrentUrl(url);
-                console.log('URL changed:', url);
-            });
-        }
+        const unsubscribe = onUrlChange((url: string) => {
+            setCurrentUrl(url);
+            console.log('URL changed:', url);
+            
+            // Update navigation state when URL changes
+            if (window.api?.view?.getNavigationState) {
+                window.api.view.getNavigationState().then(navState => {
+                    setCanGoBack(navState.canGoBack);
+                    setCanGoForward(navState.canGoForward);
+                }).catch(error => {
+                    console.error('[Navigation] Failed to update navigation state:', error);
+                });
+            }
+        });
 
         initUrl();
-    }, []);
+
+        // Cleanup URL change listener
+        return () => {
+            unsubscribe();
+        };
+    }, [getCurrentUrl, onUrlChange]);
+
+    // Navigation handlers for BrowserArea
+    // Requirement 3.2, 3.3, 3.4: Handle invalid URLs gracefully with user-friendly error messages
+    const handleNavigate = useCallback(async (url: string) => {
+        try {
+            setIsLoading(true);
+            if (window.api?.view?.navigateTo) {
+                const result = await window.api.view.navigateTo(url);
+                if (result && !result.success) {
+                    // IPC returned error result
+                    console.error('[Navigation] Navigation failed:', result.error);
+                    antdMessage.error(t('navigation_failed') || 'Failed to navigate to URL');
+                    // Current page remains loaded - no additional action needed
+                } else {
+                    console.log('[Navigation] Navigated to:', url);
+                }
+            }
+        } catch (error) {
+            // Requirement 3.2, 3.3, 3.4: Show user-friendly error message and keep current page loaded
+            console.error('[Navigation] Failed to navigate:', error);
+            antdMessage.error(t('navigation_failed') || 'Failed to navigate to URL');
+            // Current page remains loaded - no additional action needed
+        } finally {
+            setIsLoading(false);
+        }
+    }, [antdMessage, t]);
+
+    const handleBack = useCallback(async () => {
+        try {
+            if (window.api?.view?.goBack) {
+                const result = await window.api.view.goBack();
+                if (!result.success) {
+                    console.warn('[Navigation] Go back failed:', result.error);
+                    // Show user-friendly error message
+                    antdMessage.warning(t('navigation_back_failed') || 'Cannot go back');
+                }
+            }
+        } catch (error) {
+            console.error('[Navigation] Failed to go back:', error);
+            antdMessage.error(t('navigation_back_failed') || 'Failed to go back');
+        }
+    }, [antdMessage, t]);
+
+    const handleForward = useCallback(async () => {
+        try {
+            if (window.api?.view?.goForward) {
+                const result = await window.api.view.goForward();
+                if (!result.success) {
+                    console.warn('[Navigation] Go forward failed:', result.error);
+                    // Show user-friendly error message
+                    antdMessage.warning(t('navigation_forward_failed') || 'Cannot go forward');
+                }
+            }
+        } catch (error) {
+            console.error('[Navigation] Failed to go forward:', error);
+            antdMessage.error(t('navigation_forward_failed') || 'Failed to go forward');
+        }
+    }, [antdMessage, t]);
+
+    const handleReload = useCallback(async () => {
+        try {
+            setIsLoading(true);
+            if (window.api?.view?.reload) {
+                const result = await window.api.view.reload();
+                if (result && !result.success) {
+                    // IPC returned error result
+                    console.error('[Navigation] Reload failed:', result.error);
+                    antdMessage.error(t('navigation_reload_failed') || 'Failed to reload page');
+                } else {
+                    console.log('[Navigation] Page reloaded');
+                }
+            }
+        } catch (error) {
+            // Show user-friendly error message and keep current page loaded
+            console.error('[Navigation] Failed to reload:', error);
+            antdMessage.error(t('navigation_reload_failed') || 'Failed to reload page');
+        } finally {
+            setIsLoading(false);
+        }
+    }, [antdMessage, t]);
 
     // Handle implicit message passing from home page
     useEffect(() => {
@@ -167,113 +398,14 @@ export default function main() {
         }
     }, [selectedHistoryTask]);
 
-    // Monitor open history panel event (click "Execution History" from scheduled task list)
-    useEffect(() => {
-        if (!isTaskDetailMode || !window.api) return;
-
-        const handleOpenHistoryPanel = (event: any) => {
-            console.log('[Main] Received open history panel event:', event);
-
-            // Use Zustand to open history panel
-            const { setShowHistoryPanel } = useHistoryStore.getState();
-            setShowHistoryPanel(true);
-        };
-
-        // Monitor open history panel event
-        if ((window.api as any).onOpenHistoryPanel) {
-            (window.api as any).onOpenHistoryPanel(handleOpenHistoryPanel);
-        }
-
-        return () => {
-            if (window.api && (window.api as any).removeAllListeners) {
-                (window.api as any).removeAllListeners('open-history-panel');
-            }
-        };
-    }, [isTaskDetailMode]);
-
-    // Monitor task aborted by system event, update task status to IndexedDB
-    useEffect(() => {
-        if (!window.api) return;
-
-        const handleTaskAbortedBySystem = async (event: any) => {
-            const { taskId, reason, timestamp } = event;
-
-            console.log(`[Main] Task aborted by system: ${taskId}, reason: ${reason}`);
-
-            try {
-                // Update task status to abort
-                updateTask(taskId, {
-                    status: 'abort',
-                    endTime: new Date(timestamp),
-                });
-
-                antdMessage.warning(t('task_terminated_with_reason', { reason }));
-            } catch (error) {
-                console.error('[Main] Failed to update aborted task status:', error);
-            }
-        };
-
-        // Monitor task aborted by system event
-        if ((window.api as any).onTaskAbortedBySystem) {
-            (window.api as any).onTaskAbortedBySystem(handleTaskAbortedBySystem);
-        }
-
-        return () => {
-            if (window.api && (window.api as any).removeAllListeners) {
-                (window.api as any).removeAllListeners('task-aborted-by-system');
-            }
-        };
-    }, [updateTask]);
-
-    // Monitor scheduled task execution completion event, update task end time and scheduled task configuration
-    useEffect(() => {
-        if (!isTaskDetailMode || !window.api) return;
-
-        const handleTaskExecutionComplete = async (event: any) => {
-            const { taskId, executionId, status, endTime } = event;
-
-            try {
-                const endTimeDate = endTime ? new Date(endTime) : new Date();
-
-                // Update current task's end time and duration (automatically saved via useTaskManager)
-                if (taskIdRef.current) {
-                    const currentTask = tasks.find(t => t.id === taskIdRef.current);
-                    const startTime = currentTask?.startTime || currentTask?.createdAt;
-
-                    updateTask(taskIdRef.current, {
-                        endTime: endTimeDate,
-                        duration: startTime ? endTimeDate.getTime() - startTime.getTime() : undefined,
-                        status: status as any,
-                    });
-                }
-
-                // Update scheduled task configuration's lastExecutedAt field
-                const scheduledTaskId = scheduledTaskIdFromUrl || taskId;
-                if (scheduledTaskId) {
-                    await scheduledTaskStorage.updateScheduledTask(scheduledTaskId, {
-                        lastExecutedAt: endTimeDate
-                    });
-                    console.log(`[Main] Scheduled task configuration updated lastExecutedAt: ${scheduledTaskId}`);
-                }
-
-                antdMessage.success(t('task_execution_completed'));
-            } catch (error) {
-                console.error('[Main] Failed to update task completion status:', error);
-                antdMessage.error(t('failed_update_task_status'));
-            }
-        };
-
-        // Monitor task execution completion event
-        if ((window.api as any).onTaskExecutionComplete) {
-            (window.api as any).onTaskExecutionComplete(handleTaskExecutionComplete);
-        }
-
-        return () => {
-            if (window.api && (window.api as any).removeAllListeners) {
-                (window.api as any).removeAllListeners('task-execution-complete');
-            }
-        };
-    }, [isTaskDetailMode, tasks, updateTask, scheduledTaskIdFromUrl]);
+    // Use centralized event handling hook for IPC events
+    useEkoEvents({
+        isTaskDetailMode,
+        tasks,
+        updateTask,
+        scheduledTaskIdFromUrl,
+        taskIdRef,
+    });
 
     // Generic function to terminate current task
     const terminateCurrentTask = useCallback(async (reason: string = 'User manually terminated') => {
@@ -333,113 +465,6 @@ export default function main() {
         }
     }, [messages, isAtBottom, isUserScrolling]);
 
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            // Handle sending message logic
-            console.log('Sending message');
-            sendMessage(query);
-        }
-    };
-
-    const callback = {
-        onMessage: (message: StreamCallbackMessage) => {
-            console.log('Processing stream message:', message);
-
-            // Do not process new messages in history mode
-            if (isHistoryMode) return;
-
-            // Use message processor to handle stream messages
-            const updatedMessages = messageProcessorRef.current.processStreamMessage(message);
-            console.log('Updated message list:', updatedMessages);
-
-            // Handle task ID replacement: temporary task -> real task
-            const isCurrentTaskTemporary = taskIdRef.current?.startsWith('temp-');
-            const hasRealTaskId = message.taskId && !message.taskId.startsWith('temp-');
-
-            if (isCurrentTaskTemporary && hasRealTaskId) {
-                const tempTaskId = taskIdRef.current;
-                const realTaskId = message.taskId;
-
-                console.log(`Replacing temporary task ${tempTaskId} with real task ${realTaskId}`);
-
-                // Replace task ID
-                replaceTaskId(tempTaskId, realTaskId);
-
-                // Update taskIdRef
-                taskIdRef.current = realTaskId;
-
-                // Update task with new workflow info if available
-                if (message.type === 'workflow' && message.workflow?.name) {
-                    updateTask(realTaskId, {
-                        name: message.workflow.name,
-                        workflow: message.workflow,
-                        messages: updatedMessages
-                    });
-                } else {
-                    updateTask(realTaskId, { messages: updatedMessages });
-                }
-
-                return; // Exit early, task ID has been replaced
-            }
-
-            // Set task ID (if not already set and not temporary)
-            if (message.taskId && !currentTaskId && !message.taskId.startsWith('temp-')) {
-                setCurrentTaskId(message.taskId);
-            }
-
-            // Update or create task
-            const taskIdToUpdate = message.taskId || taskIdRef.current;
-            if (taskIdToUpdate) {
-                const updates: Partial<Task> = {
-                    messages: updatedMessages
-                };
-
-                if (message.type === 'workflow' && message.workflow?.name) {
-                    updates.name = message.workflow.name;
-                    updates.workflow = message.workflow;
-                }
-
-                // For error messages, also update task status
-                if (message.type === 'error') {
-                    updates.status = 'error';
-                }
-
-                // Always update task (will only work if task exists)
-                updateTask(taskIdToUpdate, updates);
-            }
-
-            // Detect tool call messages, automatically show detail panel
-            if (message.type.includes('tool')) {
-                const toolName = (message as any).toolName || 'Unknown tool';
-                const operation = getToolOperation(message);
-                const status = getToolStatus(message.type);
-
-                setCurrentTool({
-                    toolName,
-                    operation,
-                    status
-                });
-                // Show detail panel
-                if (showDetailAgents.includes(message.agentName)) {
-                    setShowDetail(true);
-                }
-
-                // Take screenshot when tool call completes
-                if (message.type === 'tool_result') {
-                    handleToolComplete({
-                        type: 'tool',
-                        id: message.toolId,
-                        toolName: message.toolName,
-                        status: 'completed',
-                        timestamp: new Date(),
-                        agentName: message.agentName
-                    });
-                }
-            }
-        },
-    }
-
     // Get tool operation description
     const getToolOperation = (message: StreamCallbackMessage): string => {
         const toolName = (message as any).toolName || '';
@@ -480,7 +505,8 @@ export default function main() {
         try {
             if (window.api && (window.api as any).getMainViewScreenshot) {
                 let result: any = null;
-                if (showDetailAgents.includes(message.agentName)) {
+                // Take screenshot for Browser and File agents to show in detail panel
+                if (DETAIL_PANEL_AGENTS.includes(message.agentName as any)) {
                     result = await (window.api as any).getMainViewScreenshot();
                 }
                 const toolMessage = {
@@ -502,6 +528,35 @@ export default function main() {
         } catch (error) {
             console.error('Screenshot failed:', error);
         }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            // Handle sending message logic
+            console.log('Sending message');
+            sendMessage(query);
+        }
+    };
+
+    // Use stream handler hook for message processing
+    const { onMessage } = useEkoStreamHandler({
+        isHistoryMode,
+        messageProcessorRef,
+        taskIdRef,
+        currentTaskId,
+        setCurrentTaskId,
+        replaceTaskId,
+        updateTask,
+        setCurrentTool,
+        setShowDetail,
+        handleToolComplete,
+        getToolOperation,
+        getToolStatus,
+    });
+
+    const callback = {
+        onMessage,
     };
 
     // Handle tool call click, show historical screenshot
@@ -613,6 +668,40 @@ export default function main() {
 
         console.log('Sending message', message);
 
+        // Check if this is the first message and transition layout if needed
+        const isFirst = isFirstMessage();
+        if (isFirst) {
+            console.log('[Layout] First message detected, transitioning to split layout');
+            // Requirement 6.1, 6.2, 6.3, 6.4, 7.3: Handle layout transition failures gracefully
+            // Requirement 8.2: Use requestAnimationFrame for coordinated updates
+            // Update React state first, then WebContentsView
+            // Avoid layout thrashing by batching DOM reads/writes
+            try {
+                const result = await optimizedSplitLayoutTransition(
+                    transitionToSplitLayout,
+                    layout.browserPanelSize,
+                    window.innerWidth,
+                    window.innerHeight,
+                    48, // tabBarHeight
+                    16  // windowMargins
+                );
+                
+                if (!result.success) {
+                    console.warn('[Layout] Layout transition completed with warnings:', result.error);
+                    // Non-blocking warning - layout may be partially applied
+                    antdMessage.warning(t('layout_transition_partial') || 'Layout transition partially completed');
+                } else {
+                    console.log('[Layout] Layout transition completed successfully');
+                }
+            } catch (error) {
+                // Requirement 6.1, 6.2, 7.3: Log error, show non-blocking warning, keep current layout
+                console.error('[Layout] Layout transition failed:', error);
+                antdMessage.warning(t('layout_transition_failed') || 'Layout transition failed, but continuing...');
+                // Don't block message sending on layout transition failure - keep current layout
+                // User can still send messages and interact with AI in full-width mode
+            }
+        }
+
         // Generate new execution ID for each task execution
         const newExecutionId = uuidv4();
         executionIdRef.current = newExecutionId;
@@ -711,158 +800,186 @@ export default function main() {
         }
     };
 
+    // Panel resize handler with constraint validation and WebContentsView coordination
+    // Requirement 8.2: Use optimized bounds update with requestAnimationFrame
+    const handleResize = useCallback(async (sizes: number[]) => {
+        try {
+            const [browserSize, sidebarSize] = sizes;
+
+            // Validate constraints
+            const clampedBrowserSize = clampPanelSize(browserSize, 40, 85);
+            const clampedSidebarSize = 100 - clampedBrowserSize;
+
+            if (Math.abs(browserSize - clampedBrowserSize) > 0.1) {
+                console.warn('[PanelResize] Browser panel out of range, clamped:', browserSize, '→', clampedBrowserSize);
+                return; // Don't update if out of range
+            }
+
+            // Update layout state (React state update)
+            const newLayout: PanelLayoutState = {
+                browserPanelSize: clampedBrowserSize,
+                aiSidebarSize: clampedSidebarSize,
+                isCollapsed: clampedSidebarSize < 15,
+                lastModified: Date.now()
+            };
+
+            setLayout(newLayout);
+
+            // Calculate and update browser view bounds for WebContentsView coordination
+            // Uses requestAnimationFrame batching to avoid layout thrashing
+            try {
+                const bounds = calculateDetailViewBounds(
+                    window.innerWidth, 
+                    clampedBrowserSize, 
+                    window.innerHeight, 
+                    layoutMode,
+                    48, // tabBarHeight
+                    16  // windowMargins
+                );
+                // Debounced update with requestAnimationFrame batching
+                await debouncedUpdateBounds(bounds);
+            } catch (boundsError) {
+                console.error('[PanelResize] Error calculating detail view bounds:', boundsError);
+                // Non-blocking - panel resize succeeded, bounds update failed
+            }
+
+            // Debounced persistence to localStorage
+            try {
+                debouncedPersist(newLayout);
+            } catch (persistError) {
+                console.error('[PanelResize] Error persisting layout:', persistError);
+                // Non-blocking - layout updated in memory, persistence failed
+            }
+        } catch (error) {
+            console.error('[PanelResize] Unexpected error during panel resize:', error);
+            // Keep current layout if resize fails completely
+        }
+    }, [debouncedPersist, debouncedUpdateBounds, layoutMode]);
+
+    // Browser view is always visible in the new layout
+    // History view management for tool history playback
+    useEffect(() => {
+        // Hide history view when not in history mode or when detail panel is hidden
+        if ((!showDetail || isHistoryMode) && window.api?.hideHistoryView) {
+            window.api.hideHistoryView().catch(error => {
+                console.error('[HistoryView] Failed to hide history view:', error);
+            });
+        }
+    }, [showDetail, isHistoryMode]);
+
     return (
-        <>
-            <Header />
-            <div className='bg-main-view bg-origin-padding bg-no-repeat bg-cover h-[calc(100%_-_48px)] overflow-y-auto text-text-01-dark flex'>
-                <div className='flex-1 h-full transition-all duration-300'>
-                    <div className='w-[636px] mx-auto flex flex-col gap-2 pt-7 pb-4 h-full relative'>
-                        {/* Task title and history button */}
-                        <div className='absolute top-0 left-0 w-full flex items-center justify-between'>
-                            <div className='line-clamp-1 text-xl font-semibold flex-1'>
-                                {currentTaskId && tasks.find(task => task.id === currentTaskId)?.name}
-                                {isHistoryMode && (
-                                    <span className='ml-2 text-sm text-gray-500'>{t('history_task_readonly')}</span>
-                                )}
-                            </div>
-                        </div>
-                        {/* Message list */}
-                        <div
-                            ref={scrollContainerRef}
-                            className='flex-1 h-full overflow-x-hidden overflow-y-auto px-4 pt-5'
-                            onScroll={handleScroll}
-                        >
-                            <MessageList messages={messages} onToolClick={handleToolClick} />
-                        </div>
-                        {/* Question input box */}
-                        <div className='h-30 gradient-border relative'>
-                            <Input.TextArea
-                                value={query}
-                                onKeyDown={handleKeyDown}
-                                onChange={(e) => setQuery(e.target.value)}
-                                className="!h-full !bg-tool-call !text-text-01-dark !placeholder-text-12-dark !py-2"
-                                placeholder={isHistoryMode ? t('history_readonly_input') : t('input_placeholder')}
-                                disabled={isHistoryMode}
-                            />
+        <div className="h-screen w-screen overflow-hidden flex" style={{ background: 'var(--mono-darkest)', padding: '16px' }}>
+            {/* LEFT side: BrowserArea with tab bar - only visible when layoutMode === 'split' */}
+            {/* Requirement 6.5: Show tab bar and browser area only in split mode */}
+            {layoutMode === 'split' && (
+                <BrowserArea
+                    currentUrl={currentUrl}
+                    onNavigate={handleNavigate}
+                    onBack={handleBack}
+                    onForward={handleForward}
+                    onReload={handleReload}
+                    canGoBack={canGoBack}
+                    canGoForward={canGoForward}
+                    isLoading={isLoading}
+                    isVisible={true}
+                    width={`${layout.browserPanelSize}%`}
+                />
+            )}
+            
+            {/* RIGHT side: AI Sidebar - width adjusts based on layout mode */}
+            {/* Full width (100%) when layoutMode === 'full-width', partial width when layoutMode === 'split' */}
+            <div 
+                className="h-full flex flex-col ai-sidebar"
+                style={{ 
+                    width: layoutMode === 'split' ? `${layout.aiSidebarSize}%` : '100%',
+                    flexShrink: 0,
+                    transition: 'width 300ms ease-in-out'
+                }}
+            >
+                <RoundedContainer className="ai-chat-panel">
+                    {/* AI Sidebar Header - relocated header functionality */}
+                    <AISidebarHeader />
 
-                            {/* Send/Cancel button - only shown in non-history mode */}
-                            {!isHistoryMode && (
-                                <div className="absolute right-3 bottom-3">
-                                    {isCurrentTaskRunning ? (
-                                        <span 
-                                        className='bg-ask-status rounded-md flex justify-center items-center w-7 h-7 cursor-pointer'
-                                        onClick={handleCancelTask}>
-                                            <CancleTask className="w-5 h-5" />
-                                        </span>
-                                    ) : (
-                                        <span
-                                        className={`bg-ask-status rounded-md flex justify-center items-center w-7 h-7 cursor-pointer ${
-                                           query ? '' : '!cursor-not-allowed opacity-60' 
-                                        }`}
-                                        onClick={() => sendMessage(query)}>
-                                            <SendMessage className="w-5 h-5" />
-                                        </span>
+                    {/* AI Sidebar Content */}
+                    <div className="flex flex-col h-full">
+                        <div className='flex-1 h-full transition-all duration-300'>
+                            <div className='w-full max-w-[636px] mx-auto flex flex-col gap-2 pt-7 pb-4 h-full relative px-4'>
+                                {/* Task title and history button */}
+                                <div className='absolute top-0 left-4 right-4 flex items-center justify-between'>
+                                    <div className='line-clamp-1 text-xl font-semibold flex-1 text-text-01-dark'>
+                                        {currentTaskId && tasks.find(task => task.id === currentTaskId)?.name}
+                                        {isHistoryMode && (
+                                            <span className='ml-2 text-sm text-gray-500'>{t('history_task_readonly')}</span>
+                                        )}
+                                    </div>
+                                </div>
+                                
+                                {/* Message list */}
+                                <div
+                                    ref={scrollContainerRef}
+                                    className='flex-1 h-full overflow-x-hidden overflow-y-auto px-4 pt-5'
+                                    onScroll={handleScroll}
+                                >
+                                    <MessageList messages={messages} onToolClick={handleToolClick} />
+                                </div>
+                                
+                                {/* Question input box */}
+                                <div className='h-30 gradient-border relative'>
+                                    <Input.TextArea
+                                        value={query}
+                                        onKeyDown={handleKeyDown}
+                                        onChange={(e) => setQuery(e.target.value)}
+                                        className="!h-full !bg-tool-call !text-text-01-dark !placeholder-text-12-dark !py-2"
+                                        placeholder={isHistoryMode ? t('history_readonly_input') : t('input_placeholder')}
+                                        disabled={isHistoryMode}
+                                    />
+
+                                    {/* Send/Cancel button - only shown in non-history mode */}
+                                    {!isHistoryMode && (
+                                        <div className="absolute right-3 bottom-3">
+                                            {isCurrentTaskRunning ? (
+                                                <span 
+                                                className='bg-ask-status rounded-md flex justify-center items-center w-7 h-7 cursor-pointer'
+                                                onClick={handleCancelTask}>
+                                                    <CancleTask className="w-5 h-5" />
+                                                </span>
+                                            ) : (
+                                                <span
+                                                className={`bg-ask-status rounded-md flex justify-center items-center w-7 h-7 cursor-pointer ${
+                                                   query ? '' : '!cursor-not-allowed opacity-60' 
+                                                }`}
+                                                onClick={() => sendMessage(query)}>
+                                                    <SendMessage className="w-5 h-5" />
+                                                </span>
+                                            )}
+                                        </div>
                                     )}
                                 </div>
-                            )}
+                            </div>
                         </div>
+
+                        {/* Detail Panel - using extracted BrowserPanel component */}
+                        <BrowserPanel
+                          isVisible={showDetail}
+                          currentTool={currentTool}
+                          currentUrl={currentUrl}
+                          toolHistory={toolHistory}
+                          currentHistoryIndex={currentHistoryIndex}
+                          onHistoryIndexChange={switchToHistoryIndex}
+                        />
                     </div>
-
-                </div>
-                <div className='h-full transition-all pt-5 pb-4 pr-4 duration-300 text-text-01-dark' style={{ width: showDetail ? '800px' : '0px' }}>
-                    {showDetail && (
-                        <div className='h-full border-border-message border flex flex-col rounded-xl'>
-                            {/* Detail panel title */}
-                            <div className='p-4'>
-                                <h3 className='text-xl font-semibold'>{t('atlas_computer')}</h3>
-                                <div className='flex flex-col items-start justify-centerce px-5 py-3 gap-3 border-border-message border rounded-md h-[80px] bg-tool-call mt-3'>
-                                    {currentTool && (
-                                        <>
-                                            <div className='border-b w-full border-dashed border-border-message flex items-center'>
-                                                {t('atlas_using_tool')}
-                                                <div className={`w-2 h-2 ml-2 rounded-full ${currentTool.status === 'running' ? 'bg-blue-500 animate-pulse' :
-                                                        currentTool.status === 'completed' ? 'bg-green-500' : 'bg-red-500'
-                                                    }`}></div>
-                                                <span className='ml-1 text-xs text-text-12-dark'>
-                                                    {currentTool.status === 'running' ? t('running') :
-                                                        currentTool.status === 'completed' ? t('completed') : t('execution_error')}
-                                                </span>
-
-                                            </div>
-                                            <h3 className='text-sm text-text-12-dark'>
-                                                {currentTool.toolName} - {currentTool.operation}
-                                            </h3>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Detail panel content area - reserved space */}
-                            <div className='p-4 pt-0 flex-1 '>
-                                <div className='border-border-message border rounded-md h-full flex flex-col'>
-                                    <div className='h-[42px] bg-tool-call rounded-md flex items-center justify-center p-2'>
-                                        {currentUrl && (
-                                            <div className='text-xs text-text-12-dark line-clamp-1'>
-                                                {currentUrl}
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div className='flex-1'></div>
-                                    <div className='h-[42px] bg-tool-call rounded-md flex items-center px-3'>
-                                        {/* Tool call progress bar */}
-                                        {toolHistory.length > 0 && (
-                                            <div className='flex-1 flex items-center gap-2'>
-                                                {/* Forward/Backward button group */}
-                                                <div className='flex items-center border border-border-message rounded'>
-                                                    <Button
-                                                        type="text"
-                                                        size="small"
-                                                        disabled={toolHistory.length === 0 || (currentHistoryIndex === 0)}
-                                                        onClick={() => {
-                                                            const newIndex = currentHistoryIndex === -1 ? toolHistory.length - 2 : currentHistoryIndex - 1;
-                                                            switchToHistoryIndex(Math.max(0, newIndex));
-                                                        }}
-                                                        className='!border-0 !rounded-r-none'
-                                                    >
-                                                        <StepUpDown className='w-3 h-3' />
-                                                    </Button>
-                                                    <Button
-                                                        type="text"
-                                                        size="small"
-                                                        disabled={currentHistoryIndex === -1}
-                                                        onClick={() => switchToHistoryIndex(currentHistoryIndex + 1)}
-                                                        className='!border-0 !rounded-l-none border-l border-border-message'
-                                                    >
-                                                        <StepUpDown className='rotate-180 w-3 h-3' />
-                                                    </Button>
-                                                </div>
-
-                                                <Slider
-                                                    className='flex-1'
-                                                    min={0}
-                                                    max={toolHistory.length}
-                                                    value={currentHistoryIndex === -1 ? toolHistory.length : currentHistoryIndex + 1}
-                                                    onChange={(value) => switchToHistoryIndex(value - 1)}
-                                                    step={1}
-                                                    marks={toolHistory.reduce((marks, _, index) => {
-                                                        marks[index + 1] = '';
-                                                        return marks;
-                                                    }, {} as Record<number, string>)}
-                                                />
-
-                                                <span className='text-xs text-text-12-dark'>
-                                                    {t('realtime')}
-                                                </span>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
+                </RoundedContainer>
             </div>
-
-        </>
+        </div>
     )
+}
+
+/**
+ * Force server-side rendering for main page
+ * This page requires window/browser APIs and cannot be statically generated
+ */
+export async function getServerSideProps() {
+  return {
+    props: {},
+  };
 }

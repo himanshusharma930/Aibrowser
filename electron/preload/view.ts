@@ -128,26 +128,72 @@ if (process.contextIsolated) {
   window.api = api;
 }
 
+// ✅ SECURITY FIX: Replaced eval() with explicit function whitelist
+// Define allowed functions that can be executed via IPC (type-safe)
+const allowedViewFunctions: Record<string, (...args: any[]) => any | Promise<any>> = {
+  // Navigation functions
+  navigateTo: (url: string) => {
+    window.location.href = url;
+    return { success: true };
+  },
+
+  // DOM manipulation functions
+  querySelector: (selector: string) => {
+    const element = document.querySelector(selector);
+    return element ? {
+      tagName: element.tagName,
+      id: element.id,
+      className: element.className,
+      textContent: element.textContent
+    } : null;
+  },
+
+  click: (selector: string) => {
+    const element = document.querySelector(selector);
+    if (element instanceof HTMLElement) {
+      element.click();
+      return { success: true };
+    }
+    return { error: 'Element not found or not clickable' };
+  },
+
+  scrollTo: (x: number, y: number) => {
+    window.scrollTo(x, y);
+    return { success: true, x, y };
+  },
+
+  // Page info functions
+  getPageInfo: () => ({
+    title: document.title,
+    url: window.location.href,
+    scrollY: window.scrollY,
+    scrollHeight: document.documentElement.scrollHeight
+  }),
+
+  // Add more allowed functions as needed
+  // IMPORTANT: Only add functions that are safe and necessary
+};
+
 ipcRenderer.on("call-view-func", async (event, { payload, replyChannel }) => {
-  let func;
-  try {
-    // @ts-ignore (define in dts) Use eval to maintain execution context
-    func = window.eval(`(${payload.func})`);
-  } catch (e: any) {
-    console.error("Failed to deserialize function:", e);
-    ipcRenderer.send(replyChannel, { error: e.message });
+  const { funcName, args } = payload;
+
+  // ✅ SECURITY: Validate function name against whitelist
+  if (!allowedViewFunctions[funcName]) {
+    const error = `Function "${funcName}" is not allowed. Available functions: ${Object.keys(allowedViewFunctions).join(', ')}`;
+    console.error(error);
+    ipcRenderer.send(replyChannel, { error });
     return;
   }
 
   let result;
   try {
-    // @ts-ignore (define in dts)
-    result = await func(...payload.args);
+    const func = allowedViewFunctions[funcName];
+    result = await func(...args);
   } catch (e: any) {
     result = { error: e.message };
+    console.error(`Error executing ${funcName}:`, e);
   }
 
-  console.log("call-view-func result", result);
-
+  console.log("call-view-func result", funcName, result);
   ipcRenderer.send(replyChannel, result);
 });

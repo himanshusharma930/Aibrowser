@@ -14,7 +14,7 @@ export class MainWindowManager {
   private window?: BrowserWindow;
   private serverManager: ServerManager;
   private currentState: WindowStateInfo;
-  private readonly loadingTimeout = 30000; // 30 second timeout
+  private readonly loadingTimeout = 60000; // 60 second timeout (allows for dev mode Next.js compilation)
 
   constructor(serverManager: ServerManager) {
     this.serverManager = serverManager;

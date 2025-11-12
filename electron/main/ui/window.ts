@@ -24,8 +24,11 @@ export function createWindow(rendererURL: string) {
     resizable: false,
     webPreferences: {
       preload: preloadPath,
-      contextIsolation: false,
-      webSecurity: true, // Allow access to media devices like microphone
+      contextIsolation: true,         // ✅ SECURITY FIX: Enable context isolation
+      nodeIntegration: false,          // ✅ SECURITY FIX: Explicitly disable node integration
+      enableRemoteModule: false,       // ✅ SECURITY FIX: Disable deprecated remote module
+      sandbox: true,                   // ✅ SECURITY FIX: Enable sandboxing
+      webSecurity: true,               // Allow access to media devices like microphone
       zoomFactor: 1.0,
     },
   });

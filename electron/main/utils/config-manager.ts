@@ -3,6 +3,8 @@ import path from "node:path";
 import { app } from "electron";
 import fs from "fs";
 import { store } from "./store";
+// ✅ SECURITY FIX: Import encryption utilities
+import { encryptSensitiveData, decryptSensitiveData, isEncryptionAvailable } from "./encryption";
 
 /**
  * Supported providers
@@ -92,10 +94,18 @@ export class ConfigManager {
   /**
    * Initialize configuration with bundled configuration support
    * Priority: Bundled .env.production > System env > Default values
+   * ✅ SECURITY FIX: Logs encryption availability
    */
   public initialize(): void {
     if (this.initialized) {
       return;
+    }
+
+    // ✅ SECURITY: Log encryption availability
+    if (isEncryptionAvailable()) {
+      console.log('[ConfigManager] ✅ OS-level encryption available (API keys will be encrypted)');
+    } else {
+      console.warn('[ConfigManager] ⚠️  Encryption unavailable (API keys stored in plain text - development only)');
     }
 
     const isDev = !app.isPackaged;
@@ -168,17 +178,25 @@ export class ConfigManager {
 
   /**
    * Get user model configurations from electron-store
+   * ✅ SECURITY FIX: Automatically decrypts encrypted API keys
    */
   public getUserModelConfigs(): UserModelConfigs {
-    return store.get('modelConfigs', {}) as UserModelConfigs;
+    const encryptedConfigs = store.get('modelConfigs', {}) as UserModelConfigs;
+
+    // ✅ SECURITY: Decrypt sensitive data before returning
+    return decryptSensitiveData(encryptedConfigs);
   }
 
   /**
    * Save user model configurations to electron-store
+   * ✅ SECURITY FIX: Automatically encrypts API keys before storage
    */
   public saveUserModelConfigs(configs: UserModelConfigs): void {
-    store.set('modelConfigs', configs);
-    console.log('[ConfigManager] User model configurations saved');
+    // ✅ SECURITY: Encrypt sensitive data before storing
+    const encryptedConfigs = encryptSensitiveData(configs);
+
+    store.set('modelConfigs', encryptedConfigs);
+    console.log('[ConfigManager] User model configurations saved (API keys encrypted)');
   }
 
   /**

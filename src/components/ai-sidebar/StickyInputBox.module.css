@@ -1,0 +1,306 @@
+/**
+ * StickyInputBox Styles
+ *
+ * Professional Input Component:
+ * - Clean, modern form styling
+ * - Accessible focus states
+ * - Smooth transitions and feedback
+ * - Proper typography hierarchy
+ * - Optimized for both keyboard and mouse interaction
+ */
+
+.stickyInputBox {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ============================================
+   FILE LIST PREVIEW
+   ============================================ */
+.fileListPreview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px;
+  background-color: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  animation: slideIn 0.2s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fileTag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background-color: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: 6px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.95);
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.fileTag:hover {
+  background-color: rgba(99, 102, 241, 0.25);
+  border-color: rgba(99, 102, 241, 0.5);
+}
+
+.fileName {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileRemove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+  transition: all 0.15s ease;
+  border-radius: 3px;
+}
+
+.fileRemove:hover {
+  color: #ef4444;
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+.fileRemove:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 1px;
+}
+
+/* ============================================
+   INPUT ROW (Main input controls)
+   ============================================ */
+.inputRow {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  width: 100%;
+  position: relative;
+  z-index: 1;
+}
+
+/* ============================================
+   ATTACH BUTTON
+   ============================================ */
+.attachButton {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border: none !important;
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 18px;
+}
+
+.attachButton:hover:not(:disabled) {
+  background-color: rgba(99, 102, 241, 0.2) !important;
+  color: rgba(99, 102, 241, 1) !important;
+  border-color: rgba(99, 102, 241, 0.3) !important;
+}
+
+.attachButton:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.attachButton:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
+.attachButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ============================================
+   TEXT AREA (Message input)
+   ============================================ */
+.textArea {
+  flex: 1;
+  background-color: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: rgba(255, 255, 255, 0.95) !important;
+  border-radius: 8px !important;
+  resize: none !important;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  line-height: 1.5;
+  font-family: inherit;
+  padding: 10px 14px !important;
+  max-height: 120px;
+}
+
+.textArea::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 400;
+}
+
+.textArea:hover {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+.textArea:focus {
+  background-color: rgba(255, 255, 255, 0.07) !important;
+  border-color: #6366f1 !important;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1) !important;
+  outline: none !important;
+}
+
+.textArea:global(.ant-input) {
+  background-color: rgba(255, 255, 255, 0.03) !important;
+  color: rgba(255, 255, 255, 0.95) !important;
+}
+
+/* ============================================
+   SEND BUTTON
+   ============================================ */
+.sendButton {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  background-color: #6366f1 !important;
+  border: none !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 18px;
+  color: #ffffff !important;
+  transition: all 0.2s ease;
+  font-weight: 600;
+}
+
+.sendButton:hover:not(:disabled) {
+  background-color: #7c3aed !important;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  transform: translateY(-1px);
+}
+
+.sendButton:active:not(:disabled) {
+  background-color: #5b21b6 !important;
+  transform: scale(0.95);
+}
+
+.sendButton:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+}
+
+.sendButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: rgba(99, 102, 241, 0.5) !important;
+}
+
+/* ============================================
+   HINT TEXT
+   ============================================ */
+.hintText {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: center;
+  opacity: 0.8;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+
+/* ============================================
+   RESPONSIVE ADJUSTMENTS
+   ============================================ */
+@media (max-width: 768px) {
+  .attachButton,
+  .sendButton {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+  }
+
+  .fileName {
+    max-width: 100px;
+  }
+
+  .textArea {
+    font-size: 13px;
+    padding: 8px 12px !important;
+  }
+}
+
+/* ============================================
+   ACCESSIBILITY
+   ============================================ */
+.attachButton:focus-visible,
+.sendButton:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stickyInputBox,
+  .fileListPreview,
+  .textArea,
+  .attachButton,
+  .sendButton {
+    transition: none;
+  }
+
+  .fileTag {
+    animation: none;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .textArea {
+    border-width: 2px !important;
+    border-color: #ffffff !important;
+  }
+
+  .sendButton {
+    border: 2px solid #ffffff;
+  }
+
+  .attachButton {
+    border: 2px solid rgba(255, 255, 255, 0.3);
+  }
+}
+
+/* Dark mode enhancements */
+@media (prefers-color-scheme: dark) {
+  .textArea {
+    background-color: rgba(0, 0, 0, 0.4) !important;
+  }
+}

@@ -3,6 +3,8 @@
  * Responsible for detecting if Next.js service has started successfully
  */
 
+import { net } from 'electron';
+
 interface HealthCheckOptions {
   maxRetries?: number;
   retryInterval?: number;
@@ -25,21 +27,38 @@ export class HealthChecker {
   async checkHealth(url: string, timeout?: number): Promise<boolean> {
     const checkTimeout = timeout || this.defaultOptions.timeout;
     
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), checkTimeout);
+    return new Promise<boolean>((resolve) => {
+      const timeoutId = setTimeout(() => {
+        console.log(`[HealthChecker] Health check timeout for ${url} after ${checkTimeout}ms`);
+        resolve(false);
+      }, checkTimeout);
 
-      const response = await fetch(url, {
-        signal: controller.signal,
-        method: 'GET',
-      });
+      try {
+        const request = net.request({
+          method: 'GET',
+          url: url,
+        });
 
-      clearTimeout(timeoutId);
-      return response.ok;
-    } catch (error) {
-      console.log(`Health check failed for ${url}:`, error);
-      return false;
-    }
+        request.on('response', (response) => {
+          clearTimeout(timeoutId);
+          const isOk = response.statusCode >= 200 && response.statusCode < 300;
+          console.log(`[HealthChecker] Health check for ${url}: ${isOk ? 'SUCCESS' : 'FAILED'} (status: ${response.statusCode})`);
+          resolve(isOk);
+        });
+
+        request.on('error', (error) => {
+          clearTimeout(timeoutId);
+          console.error(`[HealthChecker] Health check failed for ${url}:`, error.message);
+          resolve(false);
+        });
+
+        request.end();
+      } catch (error) {
+        clearTimeout(timeoutId);
+        console.error(`[HealthChecker] Health check exception for ${url}:`, error);
+        resolve(false);
+      }
+    });
   }
 
   /**

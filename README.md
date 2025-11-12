@@ -79,11 +79,14 @@ The built application will include your API configuration, so end users don't ne
 - **UI Configuration**: Configure AI models and API keys directly in the app, no file editing required
 - **Agent Configuration**: Customize AI agent behavior with custom prompts and manage MCP tools
 - **Toolbox**: Centralized hub for system features including agent configuration, scheduled tasks, and more
-- **AI-Powered Browser**: Intelligent browser with automated task execution
+- **AI-Powered Browser**: Intelligent browser with automated task execution and full navigation controls
+- **Browser Navigation**: Complete browser controls with back/forward navigation, reload, and URL management
 - **Multi-Modal AI**: Vision and text processing capabilities
 - **Scheduled Tasks**: Create and manage automated recurring tasks
 - **Speech & TTS**: Voice recognition and text-to-speech integration
 - **File Management**: Advanced file operations and management
+- **Resizable Layout**: Dynamic panel layout with browser-first design and WebContentsView coordination
+- **Layout Persistence**: Automatic saving and restoration of user's preferred panel configurations
 
 ## Screenshots
 
@@ -131,7 +134,38 @@ Customize AI agent behavior with custom prompts and manage MCP tools for enhance
 
 ## Documentation
 
+### User Guides
 - [Configuration Guide](./docs/CONFIGURATION.md) - Detailed API key setup instructions
+- [API Documentation](./docs/API.md) - Complete API reference for developers
+- [Changelog](./docs/CHANGELOG.md) - Version history and release notes
+
+### Developer Documentation
+
+#### Quick Start Guides
+- [Agent Plan Component Quick Start](./docs/QUICK_START_AGENT_PLAN.md) - Fast reference for using task visualization components
+- [IPC Quick Reference](./docs/IPC_QUICK_REFERENCE.md) - Quick guide for working with IPC communication
+
+#### Architecture & Systems
+- [IPC Architecture Diagrams](./docs/IPC_ARCHITECTURE_DIAGRAM.md) - Visual guide to IPC system with Mermaid diagrams
+- [Navigation IPC Flow](./docs/NAVIGATION_IPC_FLOW.md) - Visual guide to browser navigation IPC communication
+- [IPC System Architecture](./docs/eko-docs/architecture/ipc-system.md) - Comprehensive IPC architecture guide
+- [Layout Transformation Architecture](./docs/eko-docs/architecture/layout-transformation.md) - Resizable panel system and WebContentsView coordination
+
+#### Component Documentation
+- [UI Components Guide](./docs/eko-docs/core-concepts/ui-components.md) - Interactive components for task visualization and agent planning
+- [Component API Reference](./docs/COMPONENT_API.md) - Complete API reference for all UI components
+- [Component Changelog](./docs/COMPONENT_CHANGELOG.md) - Version history and component changes
+
+#### Migration & Changes
+- [Architecture Changes Log](./docs/ARCHITECTURE_CHANGES.md) - Track significant architectural changes
+- [Browser View Migration Guide](./docs/BROWSER_VIEW_MIGRATION_GUIDE.md) - Guide for browser view repositioning changes
+- [Navigation API Migration Guide](./docs/NAVIGATION_API_MIGRATION.md) - Guide for migrating to new navigation API (v0.0.7+)
+
+### Key Architecture Notes
+- **IPC Handler Registration**: All IPC handlers are registered **before** window creation to prevent race conditions
+- **Multi-Window Support**: Window context isolation ensures proper operation across multiple windows
+- **Type Safety**: Full TypeScript coverage for all IPC methods and component interfaces
+- **Browser View Architecture** (Updated Nov 7, 2025): Browser view now positioned on LEFT side (75% width, full height) as primary browsing area
 
 ## Acknowledgements
 

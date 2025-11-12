@@ -22,9 +22,12 @@ export function createView(rendererURL: string, preloadFileName: string, id?: st
   const mainView = new WebContentsView({
     webPreferences: {
       preload: preloadPath,
-      contextIsolation: false,
+      contextIsolation: true,          // ✅ SECURITY FIX: Enable context isolation
+      nodeIntegration: false,           // ✅ SECURITY FIX: Explicitly disable node integration
+      enableRemoteModule: false,        // ✅ SECURITY FIX: Disable deprecated remote module
+      sandbox: true,                    // ✅ SECURITY FIX: Enable sandboxing
       partition: `persist:detail-view-${id}`, // Key
-      webSecurity: true, // Allow custom protocols
+      webSecurity: true,                // Allow custom protocols
     },
   });
 
@@ -46,7 +49,7 @@ export function createView(rendererURL: string, preloadFileName: string, id?: st
 
   mainView.webContents.on("did-finish-load", () => {
     console.log(`${preloadFileName} did-finish-load`);
-    mainView.webContents.setZoomFactor(0.5)
+    mainView.webContents.setZoomFactor(1.0)
   });
 
   // Listen for network requests to capture real Xiaohongshu video URLs

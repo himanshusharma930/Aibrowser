@@ -25,5 +25,10 @@
     "reading_file": "Reading file",
     "searching": "Searching",
     "executing": "Executing {{toolName}}"
-  }
+  },
+  "navigation_failed": "Failed to navigate to URL",
+  "navigation_back_failed": "Failed to go back",
+  "navigation_forward_failed": "Failed to go forward",
+  "navigation_reload_failed": "Failed to reload page",
+  "layout_transition_failed": "Layout transition failed, but continuing..."
 }

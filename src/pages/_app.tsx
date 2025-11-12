@@ -15,9 +15,9 @@ export default function MyApp({ Component, pageProps }: AppProps) {
   // Load saved language from Electron store on mount
   useEffect(() => {
     const loadSavedLanguage = async () => {
-      if (typeof window !== 'undefined' && (window as any).api) {
+      if (typeof window !== 'undefined' && (window as any).api?.config?.getLanguage) {
         try {
-          const savedLanguage = await (window as any).api.invoke('config:get-language');
+          const savedLanguage = await (window as any).api.config.getLanguage();
           if (savedLanguage) {
             await i18n.changeLanguage(savedLanguage);
             setLanguage(savedLanguage);

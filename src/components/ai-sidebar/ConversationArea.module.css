@@ -1,0 +1,326 @@
+/**
+ * ConversationArea Styles
+ *
+ * Professional Typography & UX:
+ * - Proper typographic hierarchy with semantic spacing
+ * - Accessible color contrast ratios
+ * - Optimized line height for readability
+ * - Smooth animations and transitions
+ * - Enhanced visual feedback
+ */
+
+.conversationArea {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+/* ============================================
+   EMPTY STATE
+   ============================================ */
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.6);
+  padding: 48px 24px;
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.emptyIcon {
+  font-size: 64px;
+  margin-bottom: 16px;
+  opacity: 0.4;
+  animation: floatIn 0.5s ease-out;
+}
+
+@keyframes floatIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.emptyState h3 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  letter-spacing: -0.01em;
+}
+
+.emptyState p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  opacity: 0.75;
+}
+
+/* ============================================
+   MESSAGE WRAPPER
+   ============================================ */
+.messageWrapper {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  animation: messageIn 0.3s ease-out;
+}
+
+@keyframes messageIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.messageWrapper.user {
+  flex-direction: row-reverse;
+}
+
+/* ============================================
+   AVATAR
+   ============================================ */
+.avatar {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background-color: rgba(99, 102, 241, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+
+/* ============================================
+   MESSAGE CONTENT
+   ============================================ */
+.messageContent {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.user .messageContent {
+  align-items: flex-end;
+}
+
+/* ============================================
+   MESSAGE HEADER (Sender & Time)
+   ============================================ */
+.messageHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.user .messageHeader {
+  flex-direction: row-reverse;
+}
+
+.messageSender {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  letter-spacing: 0.02em;
+}
+
+.messageTime {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 500;
+}
+
+/* ============================================
+   MESSAGE TEXT - Core content
+   ============================================ */
+.messageText {
+  background-color: #1a1a1a;
+  padding: 12px 16px;
+  border-radius: 12px;
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 14px;
+  line-height: 1.6;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  max-width: 100%;
+  transition: all 0.2s ease;
+}
+
+.messageText:hover {
+  background-color: #252525;
+}
+
+.user .messageText {
+  background-color: #6366f1;
+  border-bottom-right-radius: 4px;
+  box-shadow: 0 4px 8px rgba(99, 102, 241, 0.2);
+}
+
+.user .messageText:hover {
+  background-color: #7c3aed;
+}
+
+.assistant .messageText {
+  border-bottom-left-radius: 4px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+/* ============================================
+   STREAMING CURSOR
+   ============================================ */
+.cursor {
+  display: inline-block;
+  animation: blink 1s infinite;
+  margin-left: 2px;
+  width: 8px;
+  height: 1em;
+  background-color: rgba(255, 255, 255, 0.8);
+  border-radius: 1px;
+}
+
+@keyframes blink {
+  0%, 49% {
+    opacity: 1;
+  }
+  50%, 100% {
+    opacity: 0.2;
+  }
+}
+
+/* ============================================
+   LOADING INDICATOR
+   ============================================ */
+.loadingIndicator {
+  display: flex;
+  gap: 6px;
+  padding: 12px 16px;
+  background-color: #1a1a1a;
+  border-radius: 12px;
+  border-bottom-left-radius: 4px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  animation: messageIn 0.3s ease-out;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #10b981;
+  animation: bounce 1.4s infinite ease-in-out both;
+}
+
+.dot:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.dot:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+@keyframes bounce {
+  0%, 80%, 100% {
+    transform: scale(0);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* ============================================
+   RESPONSIVE ADJUSTMENTS
+   ============================================ */
+@media (max-width: 768px) {
+  .messageText {
+    font-size: 13px;
+    padding: 10px 14px;
+    line-height: 1.5;
+  }
+
+  .emptyState {
+    padding: 32px 16px;
+  }
+
+  .emptyIcon {
+    font-size: 48px;
+  }
+
+  .emptyState h3 {
+    font-size: 16px;
+  }
+
+  .emptyState p {
+    font-size: 13px;
+  }
+}
+
+/* ============================================
+   ACCESSIBILITY
+   ============================================ */
+@media (prefers-reduced-motion: reduce) {
+  .messageWrapper,
+  .emptyState,
+  .messageText {
+    animation: none;
+  }
+
+  .cursor {
+    animation: none;
+  }
+
+  .dot {
+    animation: none;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .messageText {
+    border: 2px solid rgba(255, 255, 255, 0.3);
+  }
+
+  .user .messageText {
+    border: 2px solid rgba(255, 255, 255, 0.5);
+  }
+}
+
+/* Dark mode enhancements */
+@media (prefers-color-scheme: dark) {
+  .messageText {
+    background-color: #1a1a1a;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .assistant .messageText {
+    background-color: #0f0f0f;
+  }
+}

@@ -9,7 +9,8 @@ import {
 import log from "electron-log";
 import path from "node:path";
 import * as pkg from "../../package.json";
-// import { setupAutoUpdater } from './utils/auto-update';
+// ✅ SECURITY FIX: Uncomment auto-updater (now disabled by default, user-configurable)
+import { setupAutoUpdater } from './utils/auto-update';
 import { isDev } from "./utils/constants";
 import { setupMenu } from "./ui/menu";
 import { createTray } from "./ui/tray";
@@ -17,6 +18,8 @@ import { initCookies } from "./utils/cookie";
 import { reloadOnChange } from "./utils/reload";
 import { registerClientProtocol } from "./utils/protocol";
 import { ConfigManager } from "./utils/config-manager";
+// ✅ SECURITY FIX: Import migration manager
+import { runMigrations } from "./utils/migration-manager";
 
 // Initialize configuration manager
 ConfigManager.getInstance().initialize();
@@ -29,6 +32,78 @@ import { taskScheduler } from "./services/task-scheduler";
 import { windowContextManager, type WindowContext } from "./services/window-context-manager";
 import { cwd } from "node:process";
 import { registerAllIpcHandlers } from "./ipc";
+
+/**
+ * Validate and adjust bounds to ensure they're within window constraints
+ * Requirements 4.1, 4.2, 8.3, 8.4, 8.5: Validate bounds before applying to WebContentsView
+ */
+function validateBounds(
+  bounds: { x: number; y: number; width: number; height: number },
+  windowWidth: number,
+  windowHeight: number
+): { x: number; y: number; width: number; height: number } {
+  const originalBounds = { ...bounds };
+  let adjusted = false;
+
+  // Ensure non-negative values
+  if (bounds.x < 0) {
+    bounds.x = 0;
+    adjusted = true;
+  }
+  if (bounds.y < 0) {
+    bounds.y = 0;
+    adjusted = true;
+  }
+  if (bounds.width < 0) {
+    bounds.width = 100;
+    adjusted = true;
+  }
+  if (bounds.height < 0) {
+    bounds.height = 100;
+    adjusted = true;
+  }
+
+  // Requirement 8.3, 8.4: Ensure minimum dimensions (100px width/height)
+  if (bounds.width < 100) {
+    bounds.width = 100;
+    adjusted = true;
+  }
+  if (bounds.height < 100) {
+    bounds.height = 100;
+    adjusted = true;
+  }
+
+  // Requirement 8.5: Ensure bounds don't exceed window dimensions
+  if (bounds.x + bounds.width > windowWidth) {
+    bounds.width = Math.max(100, windowWidth - bounds.x);
+    adjusted = true;
+  }
+  if (bounds.y + bounds.height > windowHeight) {
+    bounds.height = Math.max(100, windowHeight - bounds.y);
+    adjusted = true;
+  }
+
+  // Ensure bounds fit within window
+  if (bounds.x >= windowWidth) {
+    bounds.x = Math.max(0, windowWidth - bounds.width);
+    adjusted = true;
+  }
+  if (bounds.y >= windowHeight) {
+    bounds.y = Math.max(0, windowHeight - bounds.height);
+    adjusted = true;
+  }
+
+  // Requirement 8.5: Log warnings for adjusted bounds
+  if (adjusted) {
+    console.warn('[BrowserViewBounds] Bounds adjusted to fit within window:', {
+      original: originalBounds,
+      adjusted: bounds,
+      window: { width: windowWidth, height: windowHeight }
+    });
+  }
+
+  return bounds;
+}
 
 Object.assign(console, log.functions);
 
@@ -139,17 +214,29 @@ async function initializeMainWindow(): Promise<BrowserWindow> {
     height: mainWindow.getBounds().height,
   });
 
-  // Create detail panel area
+  // Create browser view (main browsing area on the LEFT side)
   detailView = createView(`https://www.google.com`, "view", '1');
   mainWindow.contentView.addChildView(detailView);
-  detailView.setBounds({
-    x: 818,
-    y: 264,
-    width: 748,
-    height: 560,
-  });
+  
+  // Position browser view on the LEFT side (75% of window width by default)
+  const windowBounds = mainWindow.getBounds();
+  const browserWidth = Math.floor(windowBounds.width * 0.75); // 75% for browser panel
+  
+  // Validate bounds before applying (Requirements 4.1, 4.2, 8.3, 8.4, 8.5)
+  const initialBounds = validateBounds(
+    {
+      x: 0,
+      y: 0,
+      width: browserWidth,
+      height: windowBounds.height,
+    },
+    windowBounds.width,
+    windowBounds.height
+  );
+  
+  detailView.setBounds(initialBounds);
 
-  // Set detail view hidden by default
+  // Browser view is HIDDEN by default - only shows after first message is sent
   detailView.setVisible(false);
 
   detailView.webContents.setWindowOpenHandler(({url}) => {
@@ -272,6 +359,24 @@ async function initializeMainWindow(): Promise<BrowserWindow> {
   await app.whenReady();
   console.log("App is ready");
 
+  // ✅ SECURITY FIX: Run data migrations before anything else
+  try {
+    await runMigrations();
+    console.log('[Migration] All data migrations completed successfully');
+  } catch (error: any) {
+    console.error('[Migration] Failed to run migrations:', error);
+    // Show error dialog to user
+    dialog.showErrorBox(
+      'Migration Error',
+      `Failed to migrate application data: ${error.message}\n\nPlease report this issue.`
+    );
+    // Don't quit app - allow user to recover
+  }
+
+  // Register all IPC handlers FIRST (before creating windows)
+  registerAllIpcHandlers();
+  console.log('[IPC] All IPC handlers registered');
+
   // Register global client protocol
   registerClientProtocol(protocol);
 
@@ -327,8 +432,11 @@ app.on("window-all-closed", () => {
   // Scheduled tasks will continue executing in background
 });
 
-// Register all IPC handlers
-registerAllIpcHandlers();
-
 reloadOnChange();
-// setupAutoUpdater();
+
+// ✅ SECURITY FIX: Setup auto-updater (disabled by default, user must enable in settings)
+if (!isDev) {
+  setupAutoUpdater().catch((err) => {
+    log.error('[Auto-Update] Failed to setup auto-updater:', err);
+  });
+}

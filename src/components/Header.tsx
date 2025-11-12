@@ -1,16 +1,17 @@
-import React from 'react'
-import { Button } from 'antd'
-import { HistoryOutlined, ToolOutlined } from '@ant-design/icons'
+import React, { useState } from 'react'
+import { Button, Tooltip } from 'antd'
+import { HistoryOutlined, ToolOutlined, SettingOutlined } from '@ant-design/icons'
 import { useRouter } from 'next/router'
 import { HistoryPanel } from '@/components/HistoryPanel'
+import { SettingsDrawer } from '@/components/SettingsDrawer'
 import { useHistoryStore } from '@/stores/historyStore'
-import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { useTranslation } from 'react-i18next'
 
 export default function Header() {
   const router = useRouter()
   const { taskId, executionId } = router.query
   const { t } = useTranslation('header')
+  const [showSettings, setShowSettings] = useState(false)
 
   // Check if in scheduled task detail mode
   const isTaskDetailMode = !!taskId && !!executionId
@@ -45,9 +46,8 @@ export default function Header() {
           onClick={() => goback()}
           className='cursor-pointer ml-8 flex items-center'
         >
-          <span className='text-3xl font-bold  tracking-normal hover:scale-105 transition-all duration-300 drop-shadow-2xl relative font-["Berkshire_Swash",_cursive]'>
-            DeepFundAI
-            <span className='absolute inset-0 bg-gradient-to-r from-blue-500/20 via-blue-400/20 to-cyan-500/20 blur-sm -z-10'></span>
+          <span className='text-3xl font-bold tracking-tight hover:scale-105 transition-all duration-200 relative' style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+            Loᥫ᭡li
           </span>
         </div>
       )}
@@ -62,32 +62,44 @@ export default function Header() {
       <div className='flex justify-center items-center gap-4'>
         {/* Toolbox button - only show in home page */}
         {!isTaskDetailMode && (router.pathname === '/home' || router.pathname === '/') && (
+          <Tooltip title={t('toolbox')} placement="bottom" mouseEnterDelay={0.2}>
+            <Button
+              type="text"
+              icon={<ToolOutlined />}
+              size="small"
+              onClick={() => router.push('/toolbox')}
+              className='!text-text-01-dark hover:!bg-blue-500/10'
+              style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+              aria-label={t('toolbox')}
+            />
+          </Tooltip>
+        )}
+
+        {/* History button - icon only */}
+        <Tooltip title={isTaskDetailMode ? t('execution_history') : t('history')} placement="bottom" mouseEnterDelay={0.2}>
           <Button
             type="text"
-            icon={<ToolOutlined />}
+            icon={<HistoryOutlined />}
             size="small"
-            onClick={() => router.push('/toolbox')}
-            className='!text-text-01-dark hover:!bg-blue-500/10'
+            onClick={() => setShowHistoryPanel(true)}
+            className='!text-text-01-dark'
             style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-          >
-            {t('toolbox')}
-          </Button>
-        )}
-        <Button
-          type="text"
-          icon={<HistoryOutlined />}
-          size="small"
-          onClick={() => setShowHistoryPanel(true)}
-          className='!text-text-01-dark'
-          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-        >
-          {isTaskDetailMode ? t('execution_history') : t('history')}
-        </Button>
+            aria-label={isTaskDetailMode ? t('execution_history') : t('history')}
+          />
+        </Tooltip>
 
-        {/* Language Switcher */}
-        <div style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-          <LanguageSwitcher />
-        </div>
+        {/* Settings button - replaces language switcher */}
+        <Tooltip title="Settings" placement="bottom" mouseEnterDelay={0.2}>
+          <Button
+            type="text"
+            icon={<SettingOutlined />}
+            size="small"
+            onClick={() => setShowSettings(true)}
+            className='!text-text-01-dark'
+            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+            aria-label="Settings"
+          />
+        </Tooltip>
       </div>
 
       {/* Global history task panel - passing scheduled task info */}
@@ -98,6 +110,12 @@ export default function Header() {
         currentTaskId=""
         isTaskDetailMode={isTaskDetailMode}
         scheduledTaskId={taskId as string}
+      />
+
+      {/* Settings Drawer */}
+      <SettingsDrawer
+        visible={showSettings}
+        onClose={() => setShowSettings(false)}
       />
     </div>
   )

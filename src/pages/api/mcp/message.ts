@@ -59,6 +59,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         result = {};
         break;
 
+      case 'notifications/initialized':
+        // Client notification that initialization is complete
+        // No response needed for notifications
+        console.log('Client initialized notification received');
+        return res.status(200).send('Accepted');
+
+      case 'notifications/cancelled':
+        // Client notification that a request was cancelled
+        // No response needed for notifications
+        console.log('Client cancelled notification received');
+        return res.status(200).send('Accepted');
+
       default:
         throw new Error(`Unknown method: ${method}`);
     }

@@ -2,9 +2,13 @@ import { ipcMain } from 'electron';
 import { ConfigManager } from '../utils/config-manager';
 import { windowContextManager } from '../services/window-context-manager';
 import mcpToolManager from '../../../src/lib/mcpTools';
+// ✅ SECURITY FIX: Import validation middleware and schemas
+import { validateIpc } from './validation-middleware';
+import { AgentConfigSchema, SetMcpToolEnabledSchema } from '../../../src/types/ipc-contracts';
 
 /**
  * Register agent configuration related IPC handlers
+ * ✅ SECURITY FIX: Critical handlers now validate input
  */
 export function registerAgentHandlers() {
   const configManager = ConfigManager.getInstance();
@@ -23,26 +27,30 @@ export function registerAgentHandlers() {
   });
 
   /**
-   * Save agent configuration and reload all EkoServices
+   * Save agent configuration and reload all EkoServices - ✅ VALIDATED
    */
-  ipcMain.handle('agent:save-config', async (_, config) => {
-    try {
-      configManager.saveAgentConfig(config);
+  ipcMain.handle('agent:save-config',
+    validateIpc(AgentConfigSchema)(
+      async (_event, config) => {
+        try {
+          configManager.saveAgentConfig(config);
 
-      // Reload all window contexts
-      const contexts = windowContextManager.getAllContexts();
-      contexts.forEach(context => {
-        if (context.ekoService) {
-          context.ekoService.reloadConfig();
+          // Reload all window contexts
+          const contexts = windowContextManager.getAllContexts();
+          contexts.forEach(context => {
+            if (context.ekoService) {
+              context.ekoService.reloadConfig();
+            }
+          });
+
+          return { success: true };
+        } catch (error: any) {
+          console.error('Failed to save agent config:', error);
+          return { success: false, error: error.message };
         }
-      });
-
-      return { success: true };
-    } catch (error: any) {
-      console.error('Failed to save agent config:', error);
-      return { success: false, error: error.message };
-    }
-  });
+      }
+    )
+  );
 
   /**
    * Get all available MCP tools with their status
@@ -59,22 +67,26 @@ export function registerAgentHandlers() {
   });
 
   /**
-   * Update MCP tool enabled status
+   * Update MCP tool enabled status - ✅ VALIDATED
    */
-  ipcMain.handle('agent:set-mcp-tool-enabled', async (_, toolName: string, enabled: boolean) => {
-    try {
-      // Update tool status in McpToolManager
-      mcpToolManager.setToolEnabled(toolName, enabled);
+  ipcMain.handle('agent:set-mcp-tool-enabled',
+    validateIpc(SetMcpToolEnabledSchema)(
+      async (_event, data) => {
+        try {
+          // Update tool status in McpToolManager
+          mcpToolManager.setToolEnabled(data.toolName, data.enabled);
 
-      // Update config in ConfigManager
-      configManager.setMcpToolConfig(toolName, { enabled });
+          // Update config in ConfigManager
+          configManager.setMcpToolConfig(data.toolName, { enabled: data.enabled });
 
-      return { success: true };
-    } catch (error: any) {
-      console.error('Failed to set MCP tool status:', error);
-      return { success: false, error: error.message };
-    }
-  });
+          return { success: true };
+        } catch (error: any) {
+          console.error('Failed to set MCP tool status:', error);
+          return { success: false, error: error.message };
+        }
+      }
+    )
+  );
 
   /**
    * Reload agent configuration from storage
@@ -108,5 +120,5 @@ export function registerAgentHandlers() {
     }
   });
 
-  console.log('[IPC] Agent configuration handlers registered');
+  console.log('[IPC] Agent configuration handlers registered with validation');
 }
