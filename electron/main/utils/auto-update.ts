@@ -3,6 +3,7 @@ import type { MessageBoxOptions } from 'electron';
 import { app, dialog } from 'electron';
 import type { AppUpdater, UpdateDownloadedEvent, UpdateInfo } from 'electron-updater';
 import path from 'node:path';
+import { store } from './store'; // ✅ SECURITY FIX: Import store for settings
 
 // NOTE: workaround to use electron-updater.
 import * as electronUpdater from 'electron-updater';
@@ -10,7 +11,42 @@ import { isDev } from './constants';
 
 const autoUpdater: AppUpdater = (electronUpdater as any).default.autoUpdater;
 
+/**
+ * ✅ SECURITY FIX: Check if auto-update is enabled in settings
+ * Defaults to false for security (user must explicitly enable)
+ */
+function isAutoUpdateEnabled(): boolean {
+  return store.get('settings.autoUpdateEnabled', false) as boolean;
+}
+
+/**
+ * ✅ SECURITY FIX: Enable/disable auto-update setting
+ */
+export function setAutoUpdateEnabled(enabled: boolean): void {
+  store.set('settings.autoUpdateEnabled', enabled);
+  logger.info(`[Auto-Update] Auto-update ${enabled ? 'enabled' : 'disabled'} by user`);
+}
+
+/**
+ * ✅ SECURITY FIX: Get auto-update enabled status
+ */
+export function getAutoUpdateEnabled(): boolean {
+  return isAutoUpdateEnabled();
+}
+
+/**
+ * Setup auto-updater with user-configurable enable/disable
+ * ✅ SECURITY FIX: Only runs if explicitly enabled by user (default: disabled)
+ */
 export async function setupAutoUpdater() {
+  // ✅ SECURITY: Check if auto-update is enabled
+  if (!isAutoUpdateEnabled()) {
+    logger.info('[Auto-Update] Auto-update is disabled. Skipping update checks.');
+    logger.info('[Auto-Update] Users can enable it in Settings > Auto-Update');
+    return;
+  }
+
+  logger.info('[Auto-Update] Auto-update is enabled. Setting up update checks...');
   // Configure logger
   logger.transports.file.level = 'debug';
   autoUpdater.logger = logger;

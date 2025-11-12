@@ -27,6 +27,10 @@ export const IPC_CHANNELS = {
     CAPTURE_WINDOW_SYNC: 'capture-window-sync',
     REQUEST_CAPTURE_PERMISSION: 'request-capture-permission',
     GET_HIDDEN_WINDOW_SOURCE_ID: 'get-hidden-window-source-id',
+    GO_BACK: 'view:go-back',
+    GO_FORWARD: 'view:go-forward',
+    RELOAD: 'view:reload',
+    GET_NAVIGATION_STATE: 'view:get-navigation-state',
   },
   CONFIG: {
     GET_USER_CONFIGS: 'config:get-user-configs',
@@ -36,6 +40,8 @@ export const IPC_CHANNELS = {
     GET_SELECTED_PROVIDER: 'config:get-selected-provider',
     SET_SELECTED_PROVIDER: 'config:set-selected-provider',
     GET_ENV_VAR: 'config:get-env-var',
+    GET_LANGUAGE: 'config:get-language',
+    LANGUAGE_CHANGED: 'language-changed',
   },
   AGENT: {
     GET_CONFIG: 'agent:get-config',

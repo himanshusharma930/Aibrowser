@@ -31,11 +31,11 @@ function createDeprecatedAPIProxy<T extends Record<string, any>>(
 const api = {
   // Namespaced APIs for better organization
   eko: {
-    run: (message: string) => ipcRenderer.invoke(IPC_CHANNELS.EKO.RUN, message),
-    modify: (taskId: string, message: string) => ipcRenderer.invoke(IPC_CHANNELS.EKO.MODIFY, taskId, message),
-    execute: (taskId: string) => ipcRenderer.invoke(IPC_CHANNELS.EKO.EXECUTE, taskId),
-    getTaskStatus: (taskId: string) => ipcRenderer.invoke(IPC_CHANNELS.EKO.GET_TASK_STATUS, taskId),
-    cancelTask: (taskId: string) => ipcRenderer.invoke(IPC_CHANNELS.EKO.CANCEL_TASK, taskId),
+    run: (message: string) => ipcRenderer.invoke(IPC_CHANNELS.EKO.RUN, { message }), // ✅ SECURITY FIX: Wrap in object for validation
+    modify: (taskId: string, message: string) => ipcRenderer.invoke(IPC_CHANNELS.EKO.MODIFY, { taskId, message }), // ✅ SECURITY FIX
+    execute: (taskId: string) => ipcRenderer.invoke(IPC_CHANNELS.EKO.EXECUTE, { taskId }), // ✅ SECURITY FIX
+    getTaskStatus: (taskId: string) => ipcRenderer.invoke(IPC_CHANNELS.EKO.GET_TASK_STATUS, { taskId }), // ✅ SECURITY FIX
+    cancelTask: (taskId: string) => ipcRenderer.invoke(IPC_CHANNELS.EKO.CANCEL_TASK, { taskId }), // ✅ SECURITY FIX
     onStreamMessage: (callback: (message: any) => void) => ipcRenderer.on(IPC_CHANNELS.EKO.STREAM_MESSAGE, (_, message) => callback(message)),
   },
 
@@ -57,28 +57,34 @@ const api = {
     captureWindowSync: (winNo: number, scale?: number) => ipcRenderer.sendSync(IPC_CHANNELS.VIEW.CAPTURE_WINDOW_SYNC, winNo, scale),
     requestCapturePermission: () => ipcRenderer.invoke(IPC_CHANNELS.VIEW.REQUEST_CAPTURE_PERMISSION),
     getHiddenWindowSourceId: () => ipcRenderer.invoke(IPC_CHANNELS.VIEW.GET_HIDDEN_WINDOW_SOURCE_ID),
+    goBack: () => ipcRenderer.invoke(IPC_CHANNELS.VIEW.GO_BACK),
+    goForward: () => ipcRenderer.invoke(IPC_CHANNELS.VIEW.GO_FORWARD),
+    reload: () => ipcRenderer.invoke(IPC_CHANNELS.VIEW.RELOAD),
+    getNavigationState: () => ipcRenderer.invoke(IPC_CHANNELS.VIEW.GET_NAVIGATION_STATE),
   },
 
   config: {
     getUserModelConfigs: () => ipcRenderer.invoke(IPC_CHANNELS.CONFIG.GET_USER_CONFIGS),
-    saveUserModelConfigs: (configs: UserModelConfigs) => ipcRenderer.invoke(IPC_CHANNELS.CONFIG.SAVE_USER_CONFIGS, configs),
-    getModelConfig: (provider: 'deepseek' | 'qwen' | 'google' | 'anthropic' | 'openrouter' | 'custom') => ipcRenderer.invoke(IPC_CHANNELS.CONFIG.GET_MODEL_CONFIG, provider),
-    getApiKeySource: (provider: 'deepseek' | 'qwen' | 'google' | 'anthropic' | 'openrouter' | 'custom') => ipcRenderer.invoke(IPC_CHANNELS.CONFIG.GET_API_KEY_SOURCE, provider),
+    saveUserModelConfigs: (configs: UserModelConfigs) => ipcRenderer.invoke(IPC_CHANNELS.CONFIG.SAVE_USER_CONFIGS, configs), // ✅ SECURITY FIX: Already object
+    getModelConfig: (provider: 'deepseek' | 'qwen' | 'google' | 'anthropic' | 'openrouter' | 'custom') => ipcRenderer.invoke(IPC_CHANNELS.CONFIG.GET_MODEL_CONFIG, { provider }), // ✅ SECURITY FIX: Wrap in object
+    getApiKeySource: (provider: 'deepseek' | 'qwen' | 'google' | 'anthropic' | 'openrouter' | 'custom') => ipcRenderer.invoke(IPC_CHANNELS.CONFIG.GET_API_KEY_SOURCE, { provider }), // ✅ SECURITY FIX: Wrap in object
     getSelectedProvider: () => ipcRenderer.invoke(IPC_CHANNELS.CONFIG.GET_SELECTED_PROVIDER),
-    setSelectedProvider: (provider: 'deepseek' | 'qwen' | 'google' | 'anthropic' | 'openrouter' | 'custom') => ipcRenderer.invoke(IPC_CHANNELS.CONFIG.SET_SELECTED_PROVIDER, provider),
-    getEnvVar: (key: string) => ipcRenderer.invoke(IPC_CHANNELS.CONFIG.GET_ENV_VAR, key),
+    setSelectedProvider: (provider: 'deepseek' | 'qwen' | 'google' | 'anthropic' | 'openrouter' | 'custom') => ipcRenderer.invoke(IPC_CHANNELS.CONFIG.SET_SELECTED_PROVIDER, { provider }), // ✅ SECURITY FIX: Wrap in object
+    getEnvVar: (key: string) => ipcRenderer.invoke(IPC_CHANNELS.CONFIG.GET_ENV_VAR, { key }), // ✅ SECURITY FIX: Wrap in object
+    getLanguage: () => ipcRenderer.invoke(IPC_CHANNELS.CONFIG.GET_LANGUAGE),
+    setLanguage: (language: string) => ipcRenderer.invoke(IPC_CHANNELS.CONFIG.LANGUAGE_CHANGED, language),
   },
 
   agent: {
     getAgentConfig: () => ipcRenderer.invoke(IPC_CHANNELS.AGENT.GET_CONFIG),
-    saveAgentConfig: (config: AgentConfig) => ipcRenderer.invoke(IPC_CHANNELS.AGENT.SAVE_CONFIG, config),
+    saveAgentConfig: (config: AgentConfig) => ipcRenderer.invoke(IPC_CHANNELS.AGENT.SAVE_CONFIG, config), // ✅ SECURITY FIX: Already object
     getMcpTools: () => ipcRenderer.invoke(IPC_CHANNELS.AGENT.GET_MCP_TOOLS),
-    setMcpToolEnabled: (toolName: string, enabled: boolean) => ipcRenderer.invoke(IPC_CHANNELS.AGENT.SET_MCP_TOOL_ENABLED, toolName, enabled),
+    setMcpToolEnabled: (toolName: string, enabled: boolean) => ipcRenderer.invoke(IPC_CHANNELS.AGENT.SET_MCP_TOOL_ENABLED, { toolName, enabled }), // ✅ SECURITY FIX: Wrap in object
     reloadAgentConfig: () => ipcRenderer.invoke(IPC_CHANNELS.AGENT.RELOAD_CONFIG),
   },
 
   history: {
-    showHistoryView: (screenshot: string) => ipcRenderer.invoke(IPC_CHANNELS.HISTORY.SHOW_HISTORY_VIEW, screenshot),
+    showHistoryView: (screenshot: string) => ipcRenderer.invoke(IPC_CHANNELS.HISTORY.SHOW_HISTORY_VIEW, { screenshot }), // ✅ SECURITY FIX: Wrap in object
     hideHistoryView: () => ipcRenderer.invoke(IPC_CHANNELS.HISTORY.HIDE_HISTORY_VIEW),
   },
 

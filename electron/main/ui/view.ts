@@ -22,9 +22,12 @@ export function createView(rendererURL: string, preloadFileName: string, id?: st
   const mainView = new WebContentsView({
     webPreferences: {
       preload: preloadPath,
-      contextIsolation: false,
+      contextIsolation: true,          // ✅ SECURITY FIX: Enable context isolation
+      nodeIntegration: false,           // ✅ SECURITY FIX: Explicitly disable node integration
+      enableRemoteModule: false,        // ✅ SECURITY FIX: Disable deprecated remote module
+      sandbox: true,                    // ✅ SECURITY FIX: Enable sandboxing
       partition: `persist:detail-view-${id}`, // Key
-      webSecurity: true, // Allow custom protocols
+      webSecurity: true,                // Allow custom protocols
     },
   });
 

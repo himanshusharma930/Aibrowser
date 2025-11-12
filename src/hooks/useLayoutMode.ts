@@ -10,12 +10,9 @@ const FIRST_MESSAGE_KEY = 'manus-first-message-sent';
  */
 export function useLayoutMode() {
   const [layoutMode, setLayoutMode] = useState<LayoutMode>(() => {
-    // Check session storage for first message flag
-    if (typeof window !== 'undefined') {
-      const hasFirstMessage = sessionStorage.getItem(FIRST_MESSAGE_KEY);
-      return hasFirstMessage ? 'split' : 'full-width';
-    }
-    return 'full-width';
+    // Always start in split mode to show browser UI immediately
+    // This provides better UX for a browser application
+    return 'split';
   });
 
   /**

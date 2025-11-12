@@ -112,8 +112,8 @@ export const ModelConfigBar: React.FC = () => {
   // Load environment variables from main process
   const loadEnvVars = async () => {
     try {
-      const apiKey = await window.api.getEnvVar('CUSTOM_API_KEY');
-      const baseURL = await window.api.getEnvVar('CUSTOM_API_URL');
+      const apiKey = await window.api.config.getEnvVar('CUSTOM_API_KEY');
+      const baseURL = await window.api.config.getEnvVar('CUSTOM_API_URL');
       setEnvApiKey(apiKey);
       setEnvBaseURL(baseURL);
     } catch (error) {
@@ -188,9 +188,9 @@ export const ModelConfigBar: React.FC = () => {
 
   const loadConfigs = async () => {
     try {
-      const userConfigs = await window.api.getUserModelConfigs();
-      const provider = await window.api.getSelectedProvider();
-      const source = await window.api.getApiKeySource(provider);
+      const userConfigs = await window.api.config.getUserModelConfigs();
+      const provider = await window.api.config.getSelectedProvider();
+      const source = await window.api.config.getApiKeySource(provider);
 
       setConfigs(userConfigs);
       setSelectedProvider(provider);
@@ -203,8 +203,8 @@ export const ModelConfigBar: React.FC = () => {
   const handleProviderChange = async (value: ProviderType) => {
     try {
       setSelectedProvider(value);
-      await window.api.setSelectedProvider(value);
-      const source = await window.api.getApiKeySource(value);
+      await window.api.config.setSelectedProvider(value);
+      const source = await window.api.config.getApiKeySource(value);
       setApiKeySource(source);
     } catch (error) {
       console.error('Failed to change provider:', error);
@@ -222,7 +222,7 @@ export const ModelConfigBar: React.FC = () => {
           model: value,
         },
       };
-      await window.api.saveUserModelConfigs(updatedConfigs);
+      await window.api.config.saveUserModelConfigs(updatedConfigs);
       setConfigs(updatedConfigs);
       message.success(t('model_updated'));
     } catch (error) {
@@ -256,7 +256,7 @@ export const ModelConfigBar: React.FC = () => {
           apiKey: tempApiKey.trim(),
         },
       };
-      await window.api.saveUserModelConfigs(updatedConfigs);
+      await window.api.config.saveUserModelConfigs(updatedConfigs);
       setConfigs(updatedConfigs);
       setIsEditingApiKey(false);
       setApiKeySource('user');
@@ -292,7 +292,7 @@ export const ModelConfigBar: React.FC = () => {
           baseURL: tempBaseUrl.trim(),
         },
       };
-      await window.api.saveUserModelConfigs(updatedConfigs);
+      await window.api.config.saveUserModelConfigs(updatedConfigs);
       setConfigs(updatedConfigs);
       setIsEditingBaseUrl(false);
       message.success('Base URL saved successfully');
@@ -328,7 +328,7 @@ export const ModelConfigBar: React.FC = () => {
           model: modelValue,
         },
       };
-      await window.api.saveUserModelConfigs(updatedConfigs);
+      await window.api.config.saveUserModelConfigs(updatedConfigs);
       setConfigs(updatedConfigs);
       setIsEditingCustomModel(false);
       message.success('Model ID saved successfully');

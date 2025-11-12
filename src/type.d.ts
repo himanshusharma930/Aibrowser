@@ -152,7 +152,7 @@ interface ViewAPI {
   getMainViewScreenshot: () => Promise<{ imageBase64: string; imageType: "image/jpeg" | "image/png" }>
   getMainViewUrlAndTitle: () => Promise<{ url: string; title: string }>
   sendToMainViewExecuteCode: (func: string, args: any[]) => Promise<unknown>
-  navigateTo: (url: string) => Promise<{ url: string; title: string }>
+  navigateTo: (url: string) => Promise<{ success: boolean; error?: string }>
   getCurrentUrl: () => Promise<string>
   onUrlChange: (callback: (url: string) => void) => void
   getMainViewWindowNumber: () => Promise<number>
@@ -160,6 +160,10 @@ interface ViewAPI {
   captureWindowSync: (winNo: number, scale?: number) => { width: number; height: number; stride: number; data: Buffer; error?: string }
   requestCapturePermission: () => Promise<boolean>
   getHiddenWindowSourceId: () => Promise<string>
+  goBack: () => Promise<{ success: boolean; error?: string }>
+  goForward: () => Promise<{ success: boolean; error?: string }>
+  reload: () => Promise<{ success: boolean; error?: string }>
+  getNavigationState: () => Promise<{ canGoBack: boolean; canGoForward: boolean }>
 }
 
 interface ConfigAPI {

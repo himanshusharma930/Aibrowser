@@ -8,6 +8,7 @@ import { ModelConfigBar } from '@/components/ModelConfigBar'
 import { ChromeBrowserBackground } from '@/components/fellou/ChromeBrowserBackground'
 import { useTranslation } from 'react-i18next'
 import { FIRST_MESSAGE_KEY } from '@/hooks/useLayoutMode'
+import { optimizedFullWidthLayoutTransition } from '@/utils/layout-transition'
 
 export default function Home() {
     const [query, setQuery] = useState('')
@@ -15,18 +16,46 @@ export default function Home() {
     const { t } = useTranslation('home')
 
     // Reset layout to full-width when home page mounts
+    // Requirement 6.2, 6.3: Hide browser area and tab bar, expand AI chat panel to full width,
+    // hide WebContentsView, and maintain smooth transition
     useEffect(() => {
-        if (typeof window !== 'undefined') {
-            sessionStorage.removeItem(FIRST_MESSAGE_KEY);
-            console.log('[Home] Layout reset to full-width mode');
-            
-            // Hide browser view when returning to home
-            if ((window as any).api?.setDetailViewVisible) {
-                (window as any).api.setDetailViewVisible(false).catch((error: any) => {
-                    console.error('[Home] Failed to hide browser view:', error);
-                });
+        const resetLayout = async () => {
+            if (typeof window !== 'undefined') {
+                // Function to reset layout mode in session storage
+                const resetToFullWidth = () => {
+                    sessionStorage.removeItem(FIRST_MESSAGE_KEY);
+                    console.log('[Home] Layout mode reset to full-width');
+                };
+
+                try {
+                    // Use optimized full-width layout transition
+                    // This will:
+                    // 1. Hide WebContentsView first
+                    // 2. Wait for next animation frame for smooth coordination
+                    // 3. Update React state (hides browser area and tab bar, expands AI chat panel)
+                    const result = await optimizedFullWidthLayoutTransition(resetToFullWidth);
+                    
+                    if (!result.success) {
+                        console.warn('[Home] Layout transition completed with warnings:', result.error);
+                        // Non-blocking - layout may be partially applied
+                    } else {
+                        console.log('[Home] Full-width layout transition completed successfully');
+                    }
+                } catch (error) {
+                    console.error('[Home] Failed to transition to full-width layout:', error);
+                    // Fallback: still reset the session storage flag
+                    resetToFullWidth();
+                    // Try to hide browser view as fallback
+                    if ((window as any).api?.setDetailViewVisible) {
+                        (window as any).api.setDetailViewVisible(false).catch((error: any) => {
+                            console.error('[Home] Fallback: Failed to hide browser view:', error);
+                        });
+                    }
+                }
             }
-        }
+        };
+
+        resetLayout();
     }, []);
 
     // Initialize scheduled task scheduler

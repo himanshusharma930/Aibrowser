@@ -157,7 +157,7 @@ export class EkoService {
     this.agents = [];
 
     // Feature flag: Enable advanced tools (set to false if your API has payload size limits)
-    const ENABLE_ADVANCED_TOOLS = false; // Set to true to enable Phase 4-5 tools (38 total tools)
+    const ENABLE_ADVANCED_TOOLS = true;  // Set to true to enable Phase 4 tools (22 additional tools)
     const ENABLE_GESTURE_TOOLS = true;   // Gesture tools are lightweight, can stay enabled
 
     if (agentConfig.browserAgent.enabled) {

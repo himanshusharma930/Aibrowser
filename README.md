@@ -79,7 +79,8 @@ The built application will include your API configuration, so end users don't ne
 - **UI Configuration**: Configure AI models and API keys directly in the app, no file editing required
 - **Agent Configuration**: Customize AI agent behavior with custom prompts and manage MCP tools
 - **Toolbox**: Centralized hub for system features including agent configuration, scheduled tasks, and more
-- **AI-Powered Browser**: Intelligent browser with automated task execution
+- **AI-Powered Browser**: Intelligent browser with automated task execution and full navigation controls
+- **Browser Navigation**: Complete browser controls with back/forward navigation, reload, and URL management
 - **Multi-Modal AI**: Vision and text processing capabilities
 - **Scheduled Tasks**: Create and manage automated recurring tasks
 - **Speech & TTS**: Voice recognition and text-to-speech integration
@@ -136,6 +137,7 @@ Customize AI agent behavior with custom prompts and manage MCP tools for enhance
 ### User Guides
 - [Configuration Guide](./docs/CONFIGURATION.md) - Detailed API key setup instructions
 - [API Documentation](./docs/API.md) - Complete API reference for developers
+- [Changelog](./docs/CHANGELOG.md) - Version history and release notes
 
 ### Developer Documentation
 
@@ -145,6 +147,7 @@ Customize AI agent behavior with custom prompts and manage MCP tools for enhance
 
 #### Architecture & Systems
 - [IPC Architecture Diagrams](./docs/IPC_ARCHITECTURE_DIAGRAM.md) - Visual guide to IPC system with Mermaid diagrams
+- [Navigation IPC Flow](./docs/NAVIGATION_IPC_FLOW.md) - Visual guide to browser navigation IPC communication
 - [IPC System Architecture](./docs/eko-docs/architecture/ipc-system.md) - Comprehensive IPC architecture guide
 - [Layout Transformation Architecture](./docs/eko-docs/architecture/layout-transformation.md) - Resizable panel system and WebContentsView coordination
 
@@ -156,6 +159,7 @@ Customize AI agent behavior with custom prompts and manage MCP tools for enhance
 #### Migration & Changes
 - [Architecture Changes Log](./docs/ARCHITECTURE_CHANGES.md) - Track significant architectural changes
 - [Browser View Migration Guide](./docs/BROWSER_VIEW_MIGRATION_GUIDE.md) - Guide for browser view repositioning changes
+- [Navigation API Migration Guide](./docs/NAVIGATION_API_MIGRATION.md) - Guide for migrating to new navigation API (v0.0.7+)
 
 ### Key Architecture Notes
 - **IPC Handler Registration**: All IPC handlers are registered **before** window creation to prevent race conditions

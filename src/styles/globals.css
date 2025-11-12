@@ -297,6 +297,12 @@ body,
 }
 
 
+/* ============================================
+   LAYOUT TRANSITION ANIMATIONS
+   Modern browser UI with smooth transitions
+   Requirements: 6.3, 6.4
+   ============================================ */
+
 /* AI Sidebar Layout Transition Animations */
 .ai-sidebar {
   /* GPU-accelerated transitions for smooth animations */
@@ -306,21 +312,38 @@ body,
   -webkit-font-smoothing: subpixel-antialiased;
 }
 
-/* Reduce repaints during animation */
+/* Browser Area Layout Transitions */
 .browser-area {
-  contain: layout style paint;
+  /* GPU-accelerated transitions for smooth animations */
+  will-change: width;
+  transform: translateZ(0); /* Force GPU acceleration */
+  backface-visibility: hidden; /* Prevent flickering */
+  contain: layout style paint; /* Reduce repaints during animation */
 }
 
-/* Smooth transition for layout mode changes */
+/* Chat Panel Layout Transitions */
+.ai-chat-panel {
+  /* GPU-accelerated transitions for smooth animations */
+  will-change: width;
+  transform: translateZ(0); /* Force GPU acceleration */
+  backface-visibility: hidden; /* Prevent flickering */
+}
+
+/* Smooth transition for layout mode changes - 300ms ease-in-out */
 @media (prefers-reduced-motion: no-preference) {
-  .ai-sidebar {
-    transition: width 300ms ease-in-out;
+  .ai-sidebar,
+  .browser-area,
+  .ai-chat-panel {
+    transition: width 300ms ease-in-out, opacity 300ms ease-in-out;
   }
 }
 
-/* Respect user's motion preferences */
+/* Respect user's motion preferences - disable animations for accessibility */
 @media (prefers-reduced-motion: reduce) {
-  .ai-sidebar {
+  .ai-sidebar,
+  .browser-area,
+  .ai-chat-panel {
     transition: none;
+    will-change: auto; /* Remove will-change hint when animations are disabled */
   }
 }

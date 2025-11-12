@@ -100,6 +100,9 @@
   display: flex;
   align-items: flex-end;
   gap: 8px;
+  width: 100%;
+  position: relative;
+  z-index: 1;
 }
 
 /* ============================================
@@ -109,10 +112,10 @@
   flex-shrink: 0;
   width: 40px;
   height: 40px;
-  border: none;
-  background-color: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.7);
-  display: flex;
+  border: none !important;
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+  display: flex !important;
   align-items: center;
   justify-content: center;
   border-radius: 8px;
@@ -188,15 +191,15 @@
   flex-shrink: 0;
   width: 40px;
   height: 40px;
-  background-color: #6366f1;
-  border: none;
-  display: flex;
+  background-color: #6366f1 !important;
+  border: none !important;
+  display: flex !important;
   align-items: center;
   justify-content: center;
   border-radius: 8px;
   cursor: pointer;
   font-size: 18px;
-  color: #ffffff;
+  color: #ffffff !important;
   transition: all 0.2s ease;
   font-weight: 600;
 }
