@@ -3,6 +3,8 @@ import { useRouter } from 'next/router'
 import { PanelGroup, Panel, PanelResizeHandle } from 'react-resizable-panels'
 import AISidebarHeader from '@/components/AISidebarHeader'
 import { BrowserPanel } from '@/components/BrowserPanel'
+import { BrowserArea } from '@/components/BrowserArea'
+import RoundedContainer from '@/components/RoundedContainer'
 import { Input, Button, App } from 'antd'
 import { EkoResult, StreamCallbackMessage } from '@jarvis-agent/core/dist/types';
 import { MessageList } from '@/components/chat/MessageComponents';
@@ -17,8 +19,9 @@ import { useHistoryStore } from '@/stores/historyStore';
 import { scheduledTaskStorage } from '@/lib/scheduled-task-storage';
 import { useTranslation } from 'react-i18next';
 import { loadPersistedLayout, createDebouncedPersist, clampPanelSize } from '@/utils/panel-layout-storage';
-import { calculateDetailViewBounds } from '@/utils/detail-view-bounds';
-import { PanelLayoutState } from '@/type';
+import { calculateDetailViewBounds, validateBounds } from '@/utils/detail-view-bounds';
+import { optimizedSplitLayoutTransition, createDebouncedBoundsUpdate } from '@/utils/layout-transition';
+import { PanelLayoutState, DetailViewBounds } from '@/type';
 import { useLayoutMode } from '@/hooks/useLayoutMode';
 import { useEkoEvents } from '@/hooks/useEkoEvents';
 import { useWindowApi } from '@/hooks/useWindowApi';
@@ -59,6 +62,10 @@ export default function Main() {
     const [showDetail, setShowDetail] = useState(false);
     const [query, setQuery] = useState('');
     const [currentUrl, setCurrentUrl] = useState<string>('');
+    // Navigation state for browser controls
+    const [canGoBack, setCanGoBack] = useState(false);
+    const [canGoForward, setCanGoForward] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
     // Current tool information state
     const [currentTool, setCurrentTool] = useState<CurrentToolState | null>(null);
     // Tool call history
@@ -71,6 +78,10 @@ export default function Main() {
     // Panel layout state management
     const [layout, setLayout] = useState<PanelLayoutState>(() => loadPersistedLayout())
     const debouncedPersist = useMemo(() => createDebouncedPersist(500), [])
+    
+    // Requirement 8.2: Optimized debounced bounds update using requestAnimationFrame
+    // Creates a debounced version that batches DOM operations to avoid layout thrashing
+    const debouncedUpdateBounds = useMemo(() => createDebouncedBoundsUpdate(16), [])
 
     // Layout mode management (full-width vs split)
     // In scheduled task detail mode, always use split layout
@@ -110,49 +121,131 @@ export default function Main() {
         return () => {
             console.log('Main page unloaded, performing cleanup');
             if (window.api) {
+                // Requirement 7.3: Handle layout transition failures gracefully during cleanup
                 // Close detail view
                 if ((window.api as any).setDetailViewVisible) {
-                    (window.api as any).setDetailViewVisible(false);
+                    try {
+                        (window.api as any).setDetailViewVisible(false);
+                    } catch (error) {
+                        console.error('[Cleanup] Failed to hide detail view:', error);
+                        // Non-blocking - page is unloading anyway
+                    }
                 }
                 // Close history screenshot preview view
                 if ((window.api as any).hideHistoryView) {
-                    (window.api as any).hideHistoryView();
+                    try {
+                        (window.api as any).hideHistoryView();
+                    } catch (error) {
+                        console.error('[Cleanup] Failed to hide history view:', error);
+                        // Non-blocking - page is unloading anyway
+                    }
                 }
                 // Terminate current task
                 if ((window.api as any).ekoCancelTask && taskIdRef.current) {
-                    window.api.ekoCancelTask(taskIdRef.current);
+                    try {
+                        window.api.ekoCancelTask(taskIdRef.current);
+                    } catch (error) {
+                        console.error('[Cleanup] Failed to cancel task:', error);
+                        // Non-blocking - page is unloading anyway
+                    }
                 }
             }
         };
     }, []); // Empty dependency array, only executes on component mount/unmount
 
-    // Initialize browser view bounds on mount (but keep it hidden until first message)
+    // Coordinate WebContentsView visibility with layout mode
+    // Requirement 6.5: Update WebContentsView visibility based on layout mode
     useEffect(() => {
-        const initBrowserViewBounds = () => {
+        const updateViewVisibility = async () => {
             try {
-                const bounds = calculateDetailViewBounds(window.innerWidth, layout.browserPanelSize, window.innerHeight, layoutMode);
-                if (window.api?.updateDetailViewBounds) {
-                    window.api.updateDetailViewBounds(bounds).catch(error => {
-                        console.error('[Init] Failed to set initial browser view bounds:', error);
-                    });
+                if (window.api?.view?.setDetailViewVisible) {
+                    // Show WebContentsView only when layoutMode === 'split'
+                    // Hide WebContentsView when layoutMode === 'full-width'
+                    const shouldBeVisible = layoutMode === 'split';
+                    await window.api.view.setDetailViewVisible(shouldBeVisible);
+                    console.log('[LayoutMode] WebContentsView visibility updated:', shouldBeVisible);
                 }
-                // Browser view stays hidden until first message is sent (except in scheduled task mode)
             } catch (error) {
-                console.error('[Init] Error initializing browser view bounds:', error);
+                console.error('[LayoutMode] Failed to update WebContentsView visibility:', error);
+                // Non-blocking - visibility update failed but layout mode changed
+            }
+        };
+        
+        updateViewVisibility();
+    }, [layoutMode]); // Re-run when layout mode changes
+
+    // Update browser view bounds when layout mode changes
+    // Requirement 8.2: Use optimized bounds update with requestAnimationFrame
+    useEffect(() => {
+        // Only update bounds when in split mode (browser area is visible)
+        if (layoutMode !== 'split') {
+            return;
+        }
+        
+        // Requirement 7.3: Handle layout transition failures gracefully
+        const updateBounds = async () => {
+            try {
+                const bounds = calculateDetailViewBounds(
+                    window.innerWidth, 
+                    layout.browserPanelSize, 
+                    window.innerHeight, 
+                    layoutMode,
+                    48, // tabBarHeight
+                    16  // windowMargins
+                );
+                // Use debounced update with requestAnimationFrame for smooth transitions
+                await debouncedUpdateBounds(bounds);
+                console.log('[LayoutMode] Browser view bounds updated for layout mode:', layoutMode);
+            } catch (error) {
+                // Requirement 7.3: Log error, keep current layout
+                console.error('[LayoutMode] Failed to update browser view bounds:', error);
+                // Don't show user notification - this is a background operation
+                // Browser view will keep its current bounds until next successful update
+            }
+        };
+        
+        updateBounds();
+    }, [layoutMode, layout.browserPanelSize, debouncedUpdateBounds]); // Re-run when layout mode or browser panel size changes
+
+    // Handle window resize to update WebContentsView bounds
+    // Requirement 8.2: Use optimized bounds update with requestAnimationFrame
+    useEffect(() => {
+        const handleWindowResize = async () => {
+            try {
+                const bounds = calculateDetailViewBounds(
+                    window.innerWidth,
+                    layout.browserPanelSize,
+                    window.innerHeight,
+                    layoutMode,
+                    48, // tabBarHeight
+                    16  // windowMargins
+                );
+                // Debounced update with requestAnimationFrame batching
+                await debouncedUpdateBounds(bounds);
+            } catch (error) {
+                console.error('[WindowResize] Error calculating detail view bounds:', error);
             }
         };
 
-        initBrowserViewBounds();
-    }, [layoutMode]); // Re-run when layout mode changes
+        window.addEventListener('resize', handleWindowResize);
+
+        return () => {
+            window.removeEventListener('resize', handleWindowResize);
+        };
+    }, [layout.browserPanelSize, layoutMode, debouncedUpdateBounds]);
 
     // In scheduled task detail mode, ensure browser view is visible
     useEffect(() => {
         if (isTaskDetailMode && window.api?.setDetailViewVisible) {
+            // Requirement 7.3: Handle layout transition failures gracefully
             window.api.setDetailViewVisible(true).catch(error => {
                 console.error('[ScheduledTask] Failed to show browser view:', error);
+                // Show non-blocking warning message
+                antdMessage.warning(t('layout_transition_failed') || 'Layout transition failed, but continuing...');
+                // Keep current layout - user can still view task details in AI panel
             });
         }
-    }, [isTaskDetailMode]);
+    }, [isTaskDetailMode, antdMessage, t]);
 
     // Use window API hook for type-safe access to Electron APIs
     const { getCurrentUrl, onUrlChange } = useWindowApi();
@@ -162,12 +255,33 @@ export default function Main() {
         const initUrl = async () => {
             const url = await getCurrentUrl();
             setCurrentUrl(url);
+            
+            // Also get initial navigation state
+            if (window.api?.view?.getNavigationState) {
+                try {
+                    const navState = await window.api.view.getNavigationState();
+                    setCanGoBack(navState.canGoBack);
+                    setCanGoForward(navState.canGoForward);
+                } catch (error) {
+                    console.error('[Navigation] Failed to get initial navigation state:', error);
+                }
+            }
         };
 
         // Monitor URL changes
         const unsubscribe = onUrlChange((url: string) => {
             setCurrentUrl(url);
             console.log('URL changed:', url);
+            
+            // Update navigation state when URL changes
+            if (window.api?.view?.getNavigationState) {
+                window.api.view.getNavigationState().then(navState => {
+                    setCanGoBack(navState.canGoBack);
+                    setCanGoForward(navState.canGoForward);
+                }).catch(error => {
+                    console.error('[Navigation] Failed to update navigation state:', error);
+                });
+            }
         });
 
         initUrl();
@@ -177,6 +291,86 @@ export default function Main() {
             unsubscribe();
         };
     }, [getCurrentUrl, onUrlChange]);
+
+    // Navigation handlers for BrowserArea
+    // Requirement 3.2, 3.3, 3.4: Handle invalid URLs gracefully with user-friendly error messages
+    const handleNavigate = useCallback(async (url: string) => {
+        try {
+            setIsLoading(true);
+            if (window.api?.view?.navigateTo) {
+                const result = await window.api.view.navigateTo(url);
+                if (result && !result.success) {
+                    // IPC returned error result
+                    console.error('[Navigation] Navigation failed:', result.error);
+                    antdMessage.error(t('navigation_failed') || 'Failed to navigate to URL');
+                    // Current page remains loaded - no additional action needed
+                } else {
+                    console.log('[Navigation] Navigated to:', url);
+                }
+            }
+        } catch (error) {
+            // Requirement 3.2, 3.3, 3.4: Show user-friendly error message and keep current page loaded
+            console.error('[Navigation] Failed to navigate:', error);
+            antdMessage.error(t('navigation_failed') || 'Failed to navigate to URL');
+            // Current page remains loaded - no additional action needed
+        } finally {
+            setIsLoading(false);
+        }
+    }, [antdMessage, t]);
+
+    const handleBack = useCallback(async () => {
+        try {
+            if (window.api?.view?.goBack) {
+                const result = await window.api.view.goBack();
+                if (!result.success) {
+                    console.warn('[Navigation] Go back failed:', result.error);
+                    // Show user-friendly error message
+                    antdMessage.warning(t('navigation_back_failed') || 'Cannot go back');
+                }
+            }
+        } catch (error) {
+            console.error('[Navigation] Failed to go back:', error);
+            antdMessage.error(t('navigation_back_failed') || 'Failed to go back');
+        }
+    }, [antdMessage, t]);
+
+    const handleForward = useCallback(async () => {
+        try {
+            if (window.api?.view?.goForward) {
+                const result = await window.api.view.goForward();
+                if (!result.success) {
+                    console.warn('[Navigation] Go forward failed:', result.error);
+                    // Show user-friendly error message
+                    antdMessage.warning(t('navigation_forward_failed') || 'Cannot go forward');
+                }
+            }
+        } catch (error) {
+            console.error('[Navigation] Failed to go forward:', error);
+            antdMessage.error(t('navigation_forward_failed') || 'Failed to go forward');
+        }
+    }, [antdMessage, t]);
+
+    const handleReload = useCallback(async () => {
+        try {
+            setIsLoading(true);
+            if (window.api?.view?.reload) {
+                const result = await window.api.view.reload();
+                if (result && !result.success) {
+                    // IPC returned error result
+                    console.error('[Navigation] Reload failed:', result.error);
+                    antdMessage.error(t('navigation_reload_failed') || 'Failed to reload page');
+                } else {
+                    console.log('[Navigation] Page reloaded');
+                }
+            }
+        } catch (error) {
+            // Show user-friendly error message and keep current page loaded
+            console.error('[Navigation] Failed to reload:', error);
+            antdMessage.error(t('navigation_reload_failed') || 'Failed to reload page');
+        } finally {
+            setIsLoading(false);
+        }
+    }, [antdMessage, t]);
 
     // Handle implicit message passing from home page
     useEffect(() => {
@@ -478,19 +672,33 @@ export default function Main() {
         const isFirst = isFirstMessage();
         if (isFirst) {
             console.log('[Layout] First message detected, transitioning to split layout');
+            // Requirement 6.1, 6.2, 6.3, 6.4, 7.3: Handle layout transition failures gracefully
+            // Requirement 8.2: Use requestAnimationFrame for coordinated updates
+            // Update React state first, then WebContentsView
+            // Avoid layout thrashing by batching DOM reads/writes
             try {
-                // Transition to split layout
-                transitionToSplitLayout();
+                const result = await optimizedSplitLayoutTransition(
+                    transitionToSplitLayout,
+                    layout.browserPanelSize,
+                    window.innerWidth,
+                    window.innerHeight,
+                    48, // tabBarHeight
+                    16  // windowMargins
+                );
                 
-                // Show browser view
-                if (window.api?.setDetailViewVisible) {
-                    await window.api.setDetailViewVisible(true);
-                    console.log('[Layout] Browser view shown successfully');
+                if (!result.success) {
+                    console.warn('[Layout] Layout transition completed with warnings:', result.error);
+                    // Non-blocking warning - layout may be partially applied
+                    antdMessage.warning(t('layout_transition_partial') || 'Layout transition partially completed');
+                } else {
+                    console.log('[Layout] Layout transition completed successfully');
                 }
             } catch (error) {
-                console.error('[Layout] Failed to transition to split layout:', error);
+                // Requirement 6.1, 6.2, 7.3: Log error, show non-blocking warning, keep current layout
+                console.error('[Layout] Layout transition failed:', error);
                 antdMessage.warning(t('layout_transition_failed') || 'Layout transition failed, but continuing...');
-                // Don't block message sending on layout transition failure
+                // Don't block message sending on layout transition failure - keep current layout
+                // User can still send messages and interact with AI in full-width mode
             }
         }
 
@@ -593,44 +801,60 @@ export default function Main() {
     };
 
     // Panel resize handler with constraint validation and WebContentsView coordination
-    const handleResize = useCallback((sizes: number[]) => {
-        const [browserSize, sidebarSize] = sizes;
-
-        // Validate constraints
-        const clampedBrowserSize = clampPanelSize(browserSize, 40, 85);
-        const clampedSidebarSize = 100 - clampedBrowserSize;
-
-        if (Math.abs(browserSize - clampedBrowserSize) > 0.1) {
-            console.warn('[PanelResize] Browser panel out of range, clamped:', browserSize, '→', clampedBrowserSize);
-            return; // Don't update if out of range
-        }
-
-        // Update layout state
-        const newLayout: PanelLayoutState = {
-            browserPanelSize: clampedBrowserSize,
-            aiSidebarSize: clampedSidebarSize,
-            isCollapsed: clampedSidebarSize < 15,
-            lastModified: Date.now()
-        };
-
-        setLayout(newLayout);
-
-        // Calculate and update browser view bounds for WebContentsView coordination
+    // Requirement 8.2: Use optimized bounds update with requestAnimationFrame
+    const handleResize = useCallback(async (sizes: number[]) => {
         try {
-            const bounds = calculateDetailViewBounds(window.innerWidth, clampedBrowserSize, window.innerHeight, layoutMode);
-            if (window.api?.updateDetailViewBounds) {
-                window.api.updateDetailViewBounds(bounds).catch(error => {
-                    console.error('[PanelResize] Failed to update detail view bounds:', error);
-                    // Non-critical: detail view may be misaligned but app remains functional
-                });
+            const [browserSize, sidebarSize] = sizes;
+
+            // Validate constraints
+            const clampedBrowserSize = clampPanelSize(browserSize, 40, 85);
+            const clampedSidebarSize = 100 - clampedBrowserSize;
+
+            if (Math.abs(browserSize - clampedBrowserSize) > 0.1) {
+                console.warn('[PanelResize] Browser panel out of range, clamped:', browserSize, '→', clampedBrowserSize);
+                return; // Don't update if out of range
+            }
+
+            // Update layout state (React state update)
+            const newLayout: PanelLayoutState = {
+                browserPanelSize: clampedBrowserSize,
+                aiSidebarSize: clampedSidebarSize,
+                isCollapsed: clampedSidebarSize < 15,
+                lastModified: Date.now()
+            };
+
+            setLayout(newLayout);
+
+            // Calculate and update browser view bounds for WebContentsView coordination
+            // Uses requestAnimationFrame batching to avoid layout thrashing
+            try {
+                const bounds = calculateDetailViewBounds(
+                    window.innerWidth, 
+                    clampedBrowserSize, 
+                    window.innerHeight, 
+                    layoutMode,
+                    48, // tabBarHeight
+                    16  // windowMargins
+                );
+                // Debounced update with requestAnimationFrame batching
+                await debouncedUpdateBounds(bounds);
+            } catch (boundsError) {
+                console.error('[PanelResize] Error calculating detail view bounds:', boundsError);
+                // Non-blocking - panel resize succeeded, bounds update failed
+            }
+
+            // Debounced persistence to localStorage
+            try {
+                debouncedPersist(newLayout);
+            } catch (persistError) {
+                console.error('[PanelResize] Error persisting layout:', persistError);
+                // Non-blocking - layout updated in memory, persistence failed
             }
         } catch (error) {
-            console.error('[PanelResize] Error calculating detail view bounds:', error);
+            console.error('[PanelResize] Unexpected error during panel resize:', error);
+            // Keep current layout if resize fails completely
         }
-
-        // Debounced persistence to localStorage
-        debouncedPersist(newLayout);
-    }, [debouncedPersist, layoutMode]);
+    }, [debouncedPersist, debouncedUpdateBounds, layoutMode]);
 
     // Browser view is always visible in the new layout
     // History view management for tool history playback
@@ -644,22 +868,35 @@ export default function Main() {
     }, [showDetail, isHistoryMode]);
 
     return (
-        <div className="h-screen w-screen overflow-hidden flex" style={{ background: 'var(--mono-darkest)' }}>
-            {/* LEFT side: Empty space for Electron WebContentsView (browser) - only visible in split mode */}
+        <div className="h-screen w-screen overflow-hidden flex" style={{ background: 'var(--mono-darkest)', padding: '16px' }}>
+            {/* LEFT side: BrowserArea with tab bar - only visible when layoutMode === 'split' */}
+            {/* Requirement 6.5: Show tab bar and browser area only in split mode */}
             {layoutMode === 'split' && (
-                <div style={{ width: `${layout.browserPanelSize}%`, flexShrink: 0 }} />
+                <BrowserArea
+                    currentUrl={currentUrl}
+                    onNavigate={handleNavigate}
+                    onBack={handleBack}
+                    onForward={handleForward}
+                    onReload={handleReload}
+                    canGoBack={canGoBack}
+                    canGoForward={canGoForward}
+                    isLoading={isLoading}
+                    isVisible={true}
+                    width={`${layout.browserPanelSize}%`}
+                />
             )}
             
             {/* RIGHT side: AI Sidebar - width adjusts based on layout mode */}
+            {/* Full width (100%) when layoutMode === 'full-width', partial width when layoutMode === 'split' */}
             <div 
                 className="h-full flex flex-col ai-sidebar"
                 style={{ 
                     width: layoutMode === 'split' ? `${layout.aiSidebarSize}%` : '100%',
-                    flexShrink: 0, 
-                    background: 'var(--bg-ai-sidebar)',
+                    flexShrink: 0,
                     transition: 'width 300ms ease-in-out'
                 }}
             >
+                <RoundedContainer className="ai-chat-panel">
                     {/* AI Sidebar Header - relocated header functionality */}
                     <AISidebarHeader />
 
@@ -731,7 +968,18 @@ export default function Main() {
                           onHistoryIndexChange={switchToHistoryIndex}
                         />
                     </div>
+                </RoundedContainer>
             </div>
         </div>
     )
+}
+
+/**
+ * Force server-side rendering for main page
+ * This page requires window/browser APIs and cannot be statically generated
+ */
+export async function getServerSideProps() {
+  return {
+    props: {},
+  };
 }
