@@ -868,7 +868,12 @@ export default function Main() {
     }, [showDetail, isHistoryMode]);
 
     return (
-        <div className="h-screen w-screen overflow-hidden flex" style={{ background: 'var(--mono-darkest)', padding: '16px' }}>
+        <div
+          className="h-screen w-screen overflow-hidden flex"
+          style={{ background: 'var(--color-bg-primary)', padding: '16px' }}
+          role="main"
+          aria-label="AI Browser main interface"
+        >
             {/* LEFT side: BrowserArea with tab bar - only visible when layoutMode === 'split' */}
             {/* Requirement 6.5: Show tab bar and browser area only in split mode */}
             {layoutMode === 'split' && (
@@ -885,16 +890,18 @@ export default function Main() {
                     width={`${layout.browserPanelSize}%`}
                 />
             )}
-            
+
             {/* RIGHT side: AI Sidebar - width adjusts based on layout mode */}
             {/* Full width (100%) when layoutMode === 'full-width', partial width when layoutMode === 'split' */}
-            <div 
+            <div
                 className="h-full flex flex-col ai-sidebar"
-                style={{ 
+                style={{
                     width: layoutMode === 'split' ? `${layout.aiSidebarSize}%` : '100%',
                     flexShrink: 0,
                     transition: 'width 300ms ease-in-out'
                 }}
+                role="region"
+                aria-label="AI assistant panel"
             >
                 <RoundedContainer className="ai-chat-panel">
                     {/* AI Sidebar Header - relocated header functionality */}
@@ -902,8 +909,12 @@ export default function Main() {
 
                     {/* AI Sidebar Content */}
                     <div className="flex flex-col h-full">
-                        <div className='flex-1 h-full transition-all duration-300'>
-                            <div className='w-full max-w-[636px] mx-auto flex flex-col gap-2 pt-7 pb-4 h-full relative px-4'>
+                        <div className='flex-1 h-full overflow-hidden transition-all duration-300'>
+                            <div
+                              className='w-full max-w-[636px] mx-auto flex flex-col gap-2 pt-7 pb-4 h-full relative px-4'
+                              role="region"
+                              aria-label="Chat conversation"
+                            >
                                 {/* Task title and history button */}
                                 <div className='absolute top-0 left-4 right-4 flex items-center justify-between'>
                                     <div className='line-clamp-1 text-xl font-semibold flex-1 text-text-01-dark'>
@@ -913,18 +924,25 @@ export default function Main() {
                                         )}
                                     </div>
                                 </div>
-                                
+
                                 {/* Message list */}
                                 <div
                                     ref={scrollContainerRef}
                                     className='flex-1 h-full overflow-x-hidden overflow-y-auto px-4 pt-5'
                                     onScroll={handleScroll}
+                                    role="log"
+                                    aria-live="polite"
+                                    aria-label="Chat messages"
                                 >
                                     <MessageList messages={messages} onToolClick={handleToolClick} />
                                 </div>
-                                
-                                {/* Question input box */}
-                                <div className='h-30 gradient-border relative'>
+
+                                {/* Question input box - sticky to bottom */}
+                                <div
+                                  className='h-30 gradient-border relative sticky bottom-0 z-10 bg-gradient-to-t from-white via-white to-transparent pt-2'
+                                  role="form"
+                                  aria-label="Message input form"
+                                >
                                     <Input.TextArea
                                         value={query}
                                         onKeyDown={handleKeyDown}
@@ -932,23 +950,47 @@ export default function Main() {
                                         className="!h-full !bg-tool-call !text-text-01-dark !placeholder-text-12-dark !py-2"
                                         placeholder={isHistoryMode ? t('history_readonly_input') : t('input_placeholder')}
                                         disabled={isHistoryMode}
+                                        aria-label={isHistoryMode ? t('history_readonly_input') : t('input_placeholder')}
+                                        role="textbox"
+                                        aria-multiline="true"
+                                        tabIndex={0}
                                     />
 
                                     {/* Send/Cancel button - only shown in non-history mode */}
                                     {!isHistoryMode && (
                                         <div className="absolute right-3 bottom-3">
                                             {isCurrentTaskRunning ? (
-                                                <span 
+                                                <span
                                                 className='bg-ask-status rounded-md flex justify-center items-center w-7 h-7 cursor-pointer'
-                                                onClick={handleCancelTask}>
+                                                onClick={handleCancelTask}
+                                                role="button"
+                                                aria-label={t('terminate_task')}
+                                                tabIndex={0}
+                                                onKeyDown={(e) => {
+                                                  if (e.key === 'Enter' || e.key === ' ') {
+                                                    e.preventDefault();
+                                                    handleCancelTask();
+                                                  }
+                                                }}
+                                                >
                                                     <CancleTask className="w-5 h-5" />
                                                 </span>
                                             ) : (
                                                 <span
                                                 className={`bg-ask-status rounded-md flex justify-center items-center w-7 h-7 cursor-pointer ${
-                                                   query ? '' : '!cursor-not-allowed opacity-60' 
+                                                   query ? '' : '!cursor-not-allowed opacity-60'
                                                 }`}
-                                                onClick={() => sendMessage(query)}>
+                                                onClick={() => sendMessage(query)}
+                                                role="button"
+                                                aria-label={t('send_message')}
+                                                tabIndex={0}
+                                                onKeyDown={(e) => {
+                                                  if (e.key === 'Enter' || e.key === ' ') {
+                                                    e.preventDefault();
+                                                    sendMessage(query);
+                                                  }
+                                                }}
+                                                >
                                                     <SendMessage className="w-5 h-5" />
                                                 </span>
                                             )}

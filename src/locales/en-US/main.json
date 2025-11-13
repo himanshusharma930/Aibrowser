@@ -30,5 +30,19 @@
   "navigation_back_failed": "Failed to go back",
   "navigation_forward_failed": "Failed to go forward",
   "navigation_reload_failed": "Failed to reload page",
-  "layout_transition_failed": "Layout transition failed, but continuing..."
+  "layout_transition_failed": "Layout transition failed, but continuing...",
+  "browser_panel_region": "Browser automation panel",
+  "url_bar_region": "Current URL display",
+  "history_controls_region": "History playback controls",
+  "previous_step": "Previous step",
+  "next_step": "Next step",
+  "current_step_position": "Current step position",
+  "history_step_selector": "Select history step",
+  "go_to_realtime": "Go to real-time view",
+  "current_url": "Current URL: {{url}}",
+  "step": "Step",
+  "of": "of",
+  "tool_execution_status": "Tool execution status",
+  "terminate_task": "Terminate current task",
+  "send_message": "Send message"
 }

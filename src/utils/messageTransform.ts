@@ -54,7 +54,7 @@ export class MessageProcessor {
   private handleWorkflowMessage(message: any) {
     const key = `${message.taskId}-${this.executionId}`;
     let workflowMsg = this.workflowMessages.get(key);
-    
+
     if (!workflowMsg) {
       workflowMsg = {
         id: uuidv4(),
@@ -76,7 +76,7 @@ export class MessageProcessor {
   private handleThinkingMessage(message: any) {
     const key = `${message.taskId}-${this.executionId}`;
     let workflowMsg = this.workflowMessages.get(key);
-    
+
     if (!workflowMsg) {
       workflowMsg = {
         id: uuidv4(),
@@ -106,7 +106,7 @@ export class MessageProcessor {
   // Handle agent_start message
   private handleAgentStartMessage(message: any) {
     const agentKey = `${message.taskId}-${message.nodeId}-${this.executionId}`;
-    
+
     if (!this.agentGroups.has(agentKey)) {
       const agentGroup: AgentGroupMessage = {
         id: uuidv4(),
@@ -129,7 +129,7 @@ export class MessageProcessor {
   private handleTextMessage(message: any) {
     const agentKey = `${message.taskId}-${message.nodeId}-${this.executionId}`;
     let agentGroup = this.agentGroups.get(agentKey);
-    
+
     if (!agentGroup) {
       // If no corresponding agent group, create one
       agentGroup = {
@@ -147,10 +147,10 @@ export class MessageProcessor {
     }
 
     // Find or create corresponding text message
-    let textMessage = agentGroup.messages.find(msg => 
+    let textMessage = agentGroup.messages.find(msg =>
       msg.type === 'text' && msg.id === (message.streamId || message.id)
     );
-    
+
     if (!textMessage) {
       textMessage = {
         type: 'text',
@@ -170,7 +170,7 @@ export class MessageProcessor {
   private handleToolMessage(message: any) {
     const agentKey = `${message.taskId}-${message.nodeId}-${this.executionId}`;
     let agentGroup = this.agentGroups.get(agentKey);
-    
+
     if (!agentGroup) {
       // If no corresponding agent group, create one
       agentGroup = {
@@ -188,7 +188,7 @@ export class MessageProcessor {
     }
 
     // Find or create corresponding tool action
-    let toolAction = agentGroup.messages.find(tool => tool.id === message.toolId);
+    let toolAction = agentGroup.messages.find(tool => tool.id === message.toolId) as ToolAction;
     if (!toolAction) {
       toolAction = {
         type: 'tool',
@@ -202,17 +202,35 @@ export class MessageProcessor {
       agentGroup.messages.push(toolAction);
     } else {
       if (toolAction.type === 'tool') {
-        // Update tool status
-      toolAction.status = this.mapToolStatus(message.type);
-      if (message.params) {
-        toolAction.params = message.params;
+        // Fix: Prevent overwriting completed tools with older messages
+        // Only update if the current tool is not already completed
+        if (toolAction.status !== 'completed') {
+          // Update tool status based on message type
+          toolAction.status = this.mapToolStatus(message.type);
+
+          // Only update params if they exist and we're not in a completed state
+          if (message.params) {
+            toolAction.params = message.params;
+          }
+
+          // Only set result when the message type is specifically tool_result
+          if (message.type === 'tool_result') {
+            toolAction.result = message.result;
+            toolAction.status = 'completed';
+          }
+        } else {
+          // If tool is already completed, only allow updates if the message is a result
+          // to handle potential out-of-order messages properly
+          if (message.type === 'tool_result') {
+            // Even if already completed, we might want to update the result if it's missing
+            if (!toolAction.result) {
+              toolAction.result = message.result;
+              toolAction.status = 'completed';
+            }
+          }
+          // For other message types when already completed, do nothing to prevent overwriting
+        }
       }
-      if (message.type === 'tool_result') {
-        toolAction.result = message.result;
-        toolAction.status = 'completed';
-      }
-      }
-      
     }
   }
 
@@ -220,7 +238,7 @@ export class MessageProcessor {
   private handleAgentResultMessage(message: any) {
     const agentKey = `${message.taskId}-${message.nodeId}-${this.executionId}`;
     let agentGroup = this.agentGroups.get(agentKey);
-    
+
     if (agentGroup) {
       agentGroup.result = message.result;
       agentGroup.status = 'completed';
@@ -247,7 +265,7 @@ export class MessageProcessor {
       content,
       timestamp: new Date()
     };
-    
+
     this.messages.push(userMsg);
     return [...this.messages];
   }

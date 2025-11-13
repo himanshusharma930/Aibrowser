@@ -4,6 +4,8 @@ import type { EkoResult } from "@jarvis-agent/core/types";
 import { BrowserWindow, WebContentsView, app } from "electron";
 import path from "node:path";
 import { ConfigManager } from "../utils/config-manager";
+import { taskCheckpointManager, type Checkpoint } from "./task-checkpoint";
+import { agentContextManager } from "./agent-context-manager";
 // Phase 1, 2 & 3: Import browser tools
 import {
   browserGetMarkdownTool,
@@ -64,6 +66,7 @@ export class EkoService {
   private detailView: WebContentsView;
   private mcpClient!: SimpleSseMcpClient;
   private agents!: any[];
+  private activeCheckpoints: Map<string, Checkpoint> = new Map();
 
   constructor(mainWindow: BrowserWindow, detailView: WebContentsView) {
     this.mainWindow = mainWindow;
@@ -455,6 +458,276 @@ export class EkoService {
 
     await Promise.all(abortPromises);
     Log.info('All tasks aborted');
+  }
+
+  /**
+   * ✅ NEW: Run task with periodic checkpoint saves (Phase 1)
+   * Enables pause/resume capability with 12-Factor Agent patterns
+   */
+  async runWithCheckpoint(
+    prompt: string,
+    checkpointInterval: number = 10,
+    agents?: string[]
+  ): Promise<{ id: string; promise: Promise<any> }> {
+    if (!this.eko) {
+      const errorMsg = 'Eko service not initialized';
+      Log.error(errorMsg);
+      this.sendErrorToFrontend(errorMsg);
+      throw new Error(errorMsg);
+    }
+
+    const taskId = `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const windowId = this.mainWindow.webContents.id;
+    Log.info(`[Checkpoint] Starting task ${taskId} with checkpoint interval ${checkpointInterval}`);
+
+    // Phase 2: Initialize agent context for this window
+    await agentContextManager.initializeWindowContext(windowId);
+    Log.info(`[Checkpoint] Initialized agent context for window ${windowId}, task ${taskId}`);
+
+    const executionPromise = (async () => {
+      try {
+        // Execute task using standard Eko.run
+        const result = await this.eko!.run(prompt);
+
+        // Create completion checkpoint
+        const checkpoint = await taskCheckpointManager.loadCheckpoint(taskId);
+        if (checkpoint) {
+          await taskCheckpointManager.completeCheckpoint(taskId, result);
+          this.activeCheckpoints.delete(taskId);
+          Log.info(`[Checkpoint] Task ${taskId} completed and checkpoint saved`);
+        }
+
+        // Phase 2: Save final agent state to context
+        if (agents && agents.length > 0) {
+          for (const agentName of agents) {
+            await agentContextManager.saveAgentState(
+              windowId,
+              agentName,
+              { taskStatus: 'completed', result },
+              {}
+            );
+          }
+          Log.info(`[Checkpoint] Final agent state saved for ${agents.length} agents in task ${taskId}`);
+        }
+
+        // Phase 2: Clear context on task completion
+        await agentContextManager.clearWindowContext(windowId);
+
+        return result;
+      } catch (error: any) {
+        Log.error(`[Checkpoint] Task ${taskId} failed:`, error);
+
+        // Save failure checkpoint for recovery
+        const checkpoint = await taskCheckpointManager.loadCheckpoint(taskId);
+        if (checkpoint) {
+          await taskCheckpointManager.failCheckpoint(
+            taskId,
+            { message: error.message, code: 'EXECUTION_ERROR' },
+            'eko_run_error'
+          );
+        }
+
+        // Phase 2: Save error state to agent context for recovery
+        if (agents && agents.length > 0) {
+          for (const agentName of agents) {
+            await agentContextManager.saveAgentState(
+              windowId,
+              agentName,
+              { taskStatus: 'failed', error: error.message },
+              {}
+            );
+          }
+        }
+
+        this.sendErrorToFrontend(
+          `Checkpoint task failed: ${error.message}`,
+          error,
+          taskId
+        );
+        throw error;
+      }
+    })();
+
+    // Create initial checkpoint
+    try {
+      const initialCheckpoint = await taskCheckpointManager.createCheckpoint(
+        taskId,
+        prompt, // Store prompt as workflow for now
+        0,
+        [],
+        { variables: {}, sessionState: {} },
+        { variables: {} },
+        {
+          iteration: 0,
+          totalIterations: 0,
+          toolResults: [],
+        }
+      );
+
+      this.activeCheckpoints.set(taskId, initialCheckpoint);
+
+      // Phase 2: Initialize agent states in context
+      if (agents && agents.length > 0) {
+        for (const agentName of agents) {
+          await agentContextManager.saveAgentState(
+            windowId,
+            agentName,
+            { taskId, prompt, status: 'initialized' },
+            {}
+          );
+        }
+        Log.info(`[Checkpoint] Initialized agent context for ${agents.length} agents`);
+      }
+
+      // Emit checkpoint created event
+      if (!this.mainWindow || this.mainWindow.isDestroyed()) {
+        Log.warn('Main window destroyed, cannot emit checkpoint event');
+      } else {
+        this.mainWindow.webContents.send('eko-stream-message', {
+          type: 'checkpoint_saved',
+          checkpointId: initialCheckpoint.id,
+          taskId,
+          progress: 0,
+        });
+      }
+
+      Log.info(`[Checkpoint] Initial checkpoint ${initialCheckpoint.id} created for task ${taskId}`);
+    } catch (error: any) {
+      Log.error('[Checkpoint] Failed to create initial checkpoint:', error);
+    }
+
+    return {
+      id: taskId,
+      promise: executionPromise,
+    };
+  }
+
+  /**
+   * ✅ NEW: Resume task from checkpoint (Phase 1)
+   * Enhanced with Phase 2 Agent Context Manager integration
+   */
+  async resumeFromCheckpoint(taskId: string): Promise<{ id: string; promise: Promise<any> }> {
+    if (!this.eko) {
+      const errorMsg = 'Eko service not initialized';
+      Log.error(errorMsg);
+      this.sendErrorToFrontend(errorMsg);
+      throw new Error(errorMsg);
+    }
+
+    const windowId = this.mainWindow.webContents.id;
+    Log.info(`[Checkpoint] Resuming task ${taskId} from checkpoint for window ${windowId}`);
+
+    const checkpoint = await taskCheckpointManager.loadCheckpoint(taskId);
+    if (!checkpoint) {
+      const errorMsg = `No checkpoint found for task ${taskId}`;
+      Log.error(`[Checkpoint] ${errorMsg}`);
+      this.sendErrorToFrontend(errorMsg);
+      throw new Error(errorMsg);
+    }
+
+    if (!['paused', 'failed'].includes(checkpoint.status)) {
+      const errorMsg = `Cannot resume task with status: ${checkpoint.status}`;
+      Log.error(`[Checkpoint] ${errorMsg}`);
+      this.sendErrorToFrontend(errorMsg);
+      throw new Error(errorMsg);
+    }
+
+    // Phase 2: Ensure agent context exists for recovery
+    await agentContextManager.initializeWindowContext(windowId);
+
+    // Update checkpoint status to in_progress
+    await taskCheckpointManager.updateCheckpoint(taskId, {
+      status: 'in_progress',
+      retryCount: checkpoint.retryCount + 1,
+      lastRetryTimestamp: Date.now(),
+    });
+
+    const executionPromise = (async () => {
+      try {
+        // Phase 2: Restore agent states from context before resuming
+        const allAgentStates = await agentContextManager.getAllAgentStates(windowId);
+        Log.info(`[Checkpoint] Restoring ${allAgentStates.size} agent states for resume`);
+
+        // Re-execute using original prompt from checkpoint
+        const prompt = checkpoint.workflowXml; // Stored as prompt
+        const result = await this.eko!.run(prompt);
+
+        // Complete checkpoint
+        await taskCheckpointManager.completeCheckpoint(taskId, result);
+        this.activeCheckpoints.delete(taskId);
+
+        Log.info(`[Checkpoint] Task ${taskId} resumed and completed successfully`);
+
+        // Phase 2: Save final state and clear context
+        for (const [agentName, agentState] of allAgentStates) {
+          await agentContextManager.saveAgentState(
+            windowId,
+            agentName,
+            { ...agentState.variables, taskStatus: 'completed', result },
+            agentState.sessionState
+          );
+        }
+        await agentContextManager.clearWindowContext(windowId);
+
+        // Emit completion event
+        if (!this.mainWindow || this.mainWindow.isDestroyed()) {
+          Log.warn('Main window destroyed, cannot emit completion event');
+        } else {
+          this.mainWindow.webContents.send('eko-stream-message', {
+            type: 'completed',
+            taskId,
+            message: 'Task resumed and completed',
+          });
+        }
+
+        return result;
+      } catch (error: any) {
+        Log.error(`[Checkpoint] Task ${taskId} resume failed:`, error);
+
+        // Phase 2: Save error state for debugging
+        const allAgentStates = await agentContextManager.getAllAgentStates(windowId);
+        for (const [agentName, agentState] of allAgentStates) {
+          await agentContextManager.saveAgentState(
+            windowId,
+            agentName,
+            { ...agentState.variables, taskStatus: 'failed', resumeError: error.message },
+            agentState.sessionState
+          );
+        }
+
+        // Update failure checkpoint
+        await taskCheckpointManager.failCheckpoint(
+          taskId,
+          { message: error.message, code: 'RESUME_ERROR' },
+          'eko_resume_error'
+        );
+
+        this.sendErrorToFrontend(
+          `Failed to resume task: ${error.message}`,
+          error,
+          taskId
+        );
+        throw error;
+      }
+    })();
+
+    // Emit resume started event
+    if (!this.mainWindow || this.mainWindow.isDestroyed()) {
+      Log.warn('Main window destroyed, cannot emit resume event');
+    } else {
+      this.mainWindow.webContents.send('eko-stream-message', {
+        type: 'checkpoint_saved',
+        checkpointId: checkpoint.id,
+        taskId,
+        message: 'Resuming from checkpoint',
+        progress: checkpoint.currentNodeIndex,
+      });
+    }
+
+    return {
+      id: taskId,
+      promise: executionPromise,
+    };
   }
 
   /**

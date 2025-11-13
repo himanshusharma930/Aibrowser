@@ -1,0 +1,45 @@
+{
+  "mcpServers": {
+    "context7": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"],
+      "env": {
+        "DEFAULT_MINIMUM_TOKENS": "1000"
+      }
+    },
+    "filesystem": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/Users/roshansharma/Desktop/Vscode/deepbrowser/ai-browser"
+      ]
+    },
+    "sequentialthinking": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+    },
+    "time": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["mcp-server-time"]
+    },
+    "zen": {
+      "type": "stdio",
+      "command": "/Users/roshansharma/Desktop/Vscode/deepbrowser/ai-browser/.claude/zen-mcp-server/.zen_venv/bin/python",
+      "args": [
+        "/Users/roshansharma/Desktop/Vscode/deepbrowser/ai-browser/.claude/zen-mcp-server/server.py"
+      ],
+      "env": {
+        "CUSTOM_API_URL": "http://143.198.174.251:8317/v1",
+        "CUSTOM_API_KEY": "sk-anything",
+        "DEFAULT_MODEL": "auto",
+        "DEFAULT_THINKING_MODE_THINKDEEP": "high",
+        "LOG_LEVEL": "INFO"
+      }
+    }
+  }
+}

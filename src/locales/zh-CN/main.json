@@ -30,5 +30,17 @@
   "navigation_back_failed": "后退失败",
   "navigation_forward_failed": "前进失败",
   "navigation_reload_failed": "重新加载页面失败",
-  "layout_transition_failed": "布局转换失败，但继续..."
+  "layout_transition_failed": "布局转换失败，但继续...",
+  "browser_panel_region": "浏览器自动化面板",
+  "url_bar_region": "当前 URL 显示",
+  "history_controls_region": "历史回放控制",
+  "previous_step": "上一步",
+  "next_step": "下一步",
+  "current_step_position": "当前步骤位置",
+  "history_step_selector": "选择历史步骤",
+  "go_to_realtime": "转到实时视图",
+  "current_url": "当前 URL：{{url}}",
+  "step": "步骤",
+  "of": "共",
+  "tool_execution_status": "工具执行状态"
 }

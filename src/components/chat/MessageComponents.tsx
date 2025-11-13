@@ -14,16 +14,17 @@ interface MessageDisplayProps {
 
 // Workflow display component
 const WorkflowDisplay = ({ workflow }: { workflow: any }) => {
+  const { t } = useTranslation('chat');
   if (!workflow) return null;
 
   // Check if thought is completed by whether agents field exists and has content
   const isThoughtCompleted = workflow.agents && workflow.agents.length > 0;
 
   return (
-    <div className="workflow-display space-y-4">
+    <div className="workflow-display space-y-4" role="region" aria-label={t('workflow_region')}>
       <div className='flex items-center gap-2'>
         <Atlas />
-        <span className="text-lg font-bold">Atlas</span>
+        <span className="text-lg font-bold" aria-label={t('atlas_label')}>Atlas</span>
       </div>
 
       {/* Thinking process - dark theme style */}
@@ -33,7 +34,7 @@ const WorkflowDisplay = ({ workflow }: { workflow: any }) => {
 
       {/* Agent list - STEP format */}
       {workflow.agents && workflow.agents.length > 0 && (
-        <div className="space-y-3">
+        <div className="space-y-3" role="list" aria-label={t('agent_list')}>
           {workflow.agents.map((agent: any, index: number) => (
             <StepAgentDisplay key={agent.id || index} agent={agent} stepNumber={index + 1} />
           ))}
@@ -64,11 +65,21 @@ const ThinkingDisplay = ({ content, isCompleted = false }: { content: string; is
   const [collapsed, setCollapsed] = useState(false);
 
   return (
-    <div className="bg-thinking rounded-lg p-4">
+    <div className="bg-thinking rounded-lg p-4" role="region" aria-label={t('thinking_region')}>
       {/* Header */}
       <div
         className="flex items-center justify-start gap-1 cursor-pointer mb-3"
         onClick={() => setCollapsed(!collapsed)}
+        role="button"
+        aria-expanded={!collapsed}
+        aria-label={collapsed ? t('expand_thinking') : t('collapse_thinking')}
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setCollapsed(!collapsed);
+          }
+        }}
       >
         <div className="flex items-center space-x-2">
           {isCompleted ? (
@@ -83,12 +94,13 @@ const ThinkingDisplay = ({ content, isCompleted = false }: { content: string; is
           size="small"
           icon={collapsed ? <ExpandCollapse className=' rotate-180' /> : <ExpandCollapse />}
           className="!text-gray-400 hover:!text-white"
+          aria-label={collapsed ? t('expand') : t('collapse')}
         />
       </div>
 
       {/* Content */}
       {!collapsed && (
-        <div className="text-sm text-text-12-dark leading-relaxed">
+        <div className="text-sm text-text-12-dark leading-relaxed" aria-live="polite">
           {content}
         </div>
       )}
@@ -101,27 +113,27 @@ const StepAgentDisplay = ({ agent, stepNumber }: { agent: any; stepNumber: numbe
   const { t } = useTranslation('chat');
 
   return (
-    <div className="step-agent-display text-base">
+    <div className="step-agent-display text-base" role="listitem">
       {/* Agent information - status display removed */}
       <div className="px-2 border-l-2 border-text-05-dark mb-3">
-        <div className="flex items-center gap-1 text-text-05-dark font-semibold ">
+        <div className="flex items-center gap-1 text-text-05-dark font-semibold " role="heading" aria-level={3}>
           <DeepThinking />
           {agent.name} {t('agent')}
         </div>
-        <div className="mt-1">
+        <div className="mt-1" aria-label={t('agent_task', { task: agent.task })}>
           {agent.task}
         </div>
       </div>
 
       {/* Execution steps - STEP format */}
       {agent.nodes && agent.nodes.length > 0 && (
-        <div className="space-y-2">
+        <div className="space-y-2" role="list" aria-label={t('execution_steps')}>
           {agent.nodes.map((node: any, nodeIndex: number) => (
-            <div key={nodeIndex} className="step-item flex items-center justify-start gap-2 mt-3">
-              <span className="font-semibold w-5 h-5 bg-step rounded-full flex items-center justify-center">
+            <div key={nodeIndex} className="step-item flex items-center justify-start gap-2 mt-3" role="listitem">
+              <span className="font-semibold w-5 h-5 bg-step rounded-full flex items-center justify-center" aria-label={t('step_number', { number: nodeIndex + 1 })}>
                 {nodeIndex + 1}
               </span>
-              <span className='line-clamp-1 flex-1'>
+              <span className='line-clamp-1 flex-1' aria-label={t('step_description', { description: renderNodeText(node, t) })}>
                 {renderNodeText(node, t)}
               </span>
             </div>
@@ -151,13 +163,37 @@ const ToolDisplay = ({
     return <Executing />;
   };
 
+  // Get status text for screen readers
+  const getStatusText = () => {
+    switch (message.status) {
+      case 'running':
+        return t('tool_running_status');
+      case 'completed':
+        return t('tool_completed_status');
+      case 'error':
+        return t('tool_error_status');
+      default:
+        return t('tool_unknown_status');
+    }
+  };
+
   return (
     <div
       className="inline-flex items-center gap-2 px-3 py-2 bg-tool-call rounded-md border text-xs border-border-message text-text-12-dark cursor-pointer hover:bg-opacity-80 transition-colors"
       onClick={() => onToolClick(message)}
+      role="button"
+      aria-label={t('tool_execution_label', { toolName: message.toolName || 'tool' })}
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onToolClick(message);
+        }
+      }}
     >
       {getToolIcon(message.toolName)}
       <span>{t('executing_tool', { toolName: message.toolName || 'tool' })}</span>
+      <span className="sr-only">{getStatusText()}</span>
     </div>
   );
 };
@@ -167,7 +203,7 @@ const MessageContent = ({ message, onToolClick }: { message: DisplayMessage, onT
   // User message
   if (message.type === 'user') {
     return (
-      <div className="px-4 py-3 rounded-lg bg-message border border-border-message">
+      <div className="px-4 py-3 rounded-lg bg-message border border-border-message" role="region" aria-label="User message">
         <span className="text-base">{message.content}</span>
       </div>
     );
@@ -198,7 +234,7 @@ const AgentMessageContent = ({ message, onToolClick }: { message: AgentMessage, 
       return null; // Don't display empty content messages
     }
     return (
-      <div className="message-text text-text-12-dark markdown-container">
+      <div className="message-text text-text-12-dark markdown-container" role="region" aria-label="Agent message">
         <ReactMarkdown>{content}</ReactMarkdown>
       </div>
     );
@@ -221,10 +257,10 @@ const MessageItem = ({ message, onToolClick }: MessageDisplayProps) => {
   }
 
   return (
-    <div className='message-item mb-4'>
+    <div className='message-item mb-4' role="listitem">
       {/* Outer container for left/right alignment */}
       <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-        <div className='text-text-01-dark w-full'>
+        <div className='text-text-01-dark w-full' role="region" aria-label={isUser ? "User message" : "Assistant message"}>
           {messageContent}
         </div>
       </div>
@@ -240,39 +276,76 @@ const AgentGroupDisplay = ({
   agentMessage: AgentGroupMessage;
   onToolClick?: (message: ToolAction) => void;
 }) => {
+  const { t } = useTranslation('chat');
   const [isCollapsed, setIsCollapsed] = useState(false);
 
+  // Get status text for screen readers
+  const getStatusText = () => {
+    switch (agentMessage.status) {
+      case 'completed':
+        return t('agent_completed_status');
+      case 'error':
+        return t('agent_error_status');
+      case 'running':
+        return t('agent_running_status');
+      default:
+        return t('agent_unknown_status');
+    }
+  };
+
+  // Get status icon for visual display
+  const getStatusIcon = () => {
+    switch (agentMessage.status) {
+      case 'completed':
+        return <FinishStatus />;
+      case 'error':
+        return (
+          <div className="w-4 h-4 rounded-full bg-red-500 flex items-center justify-center" role="img" aria-label={t('error_icon')}>
+            <span className="text-white text-xs">✕</span>
+          </div>
+        );
+      case 'running':
+        return <RuningStatus />;
+      default:
+        return <RuningStatus />;
+    }
+  };
+
   return (
-    <div className="agent-group mb-4 mt-10">
+    <div className="agent-group mb-4 mt-10" role="region" aria-label={t('agent_group_region')}>
       {/* Agent task title */}
       <div
         className="flex items-center cursor-pointer transition-colors mb-4"
         onClick={() => setIsCollapsed(!isCollapsed)}
+        role="button"
+        aria-expanded={!isCollapsed}
+        aria-label={isCollapsed ? t('expand_agent_group') : t('collapse_agent_group')}
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setIsCollapsed(!isCollapsed);
+          }
+        }}
       >
         <div className="flex items-center gap-2">
-          {agentMessage.status === 'completed' ? (
-            <FinishStatus />
-          ) : agentMessage.status === 'error' ? (
-            <div className="w-4 h-4 rounded-full bg-red-500 flex items-center justify-center">
-              <span className="text-white text-xs">✕</span>
-            </div>
-          ) : (
-            <RuningStatus />
-          )}
+          {getStatusIcon()}
           <span className="font-semibold">
             {agentMessage.agentNode?.task || agentMessage.agentName}
           </span>
+          <span className="sr-only">{getStatusText()}</span>
         </div>
         <Button
           type="text"
           size="small"
           icon={isCollapsed ? <ExpandCollapse className=' rotate-180' /> : <ExpandCollapse />}
+          aria-label={isCollapsed ? t('expand') : t('collapse')}
         />
       </div>
 
       {/* Agent execution steps */}
       {!isCollapsed && (
-        <div className="agent-steps">
+        <div className="agent-steps" role="region" aria-label={t('agent_steps_region')}>
           {agentMessage.messages.map((message) => {
             return (
               <div key={message.id} className="agent-step">
@@ -298,7 +371,7 @@ const MessageListComponent = ({
 }) => {
 
   return (
-    <div className="message-list space-y-2">
+    <div className="message-list space-y-2" role="list" aria-label="Chat messages">
       {messages.map((message) => <MessageItem message={message} key={message.id} onToolClick={onToolClick} />)}
     </div>
   );

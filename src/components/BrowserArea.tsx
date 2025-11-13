@@ -1,6 +1,6 @@
 /**
  * BrowserArea Component
- * 
+ *
  * Combines the tab bar and browser panel with rounded container
  * Manages the visual layout for the browser side of the split view
  */
@@ -42,7 +42,12 @@ export const BrowserArea: React.FC<BrowserAreaProps> = ({
   }
 
   return (
-    <div className={`${styles.browserArea} browser-area`} style={{ width }}>
+    <div
+      className={`${styles.browserArea} browser-area`}
+      style={{ width }}
+      role="region"
+      aria-label="Browser automation area"
+    >
       <RoundedContainer className={styles.browserContainer}>
         {/* Requirement 6.5: Tab bar is only rendered when browser area is visible (split mode) */}
         <TabBar
@@ -57,7 +62,11 @@ export const BrowserArea: React.FC<BrowserAreaProps> = ({
         />
         {/* WebContentsView will be positioned here by Electron */}
         {/* Requirement 6.5: Browser content area is only rendered when browser area is visible (split mode) */}
-        <div className={styles.browserContent}>
+        <div
+          className={styles.browserContent}
+          role="main"
+          aria-label="Browser content"
+        >
           {/* This div serves as a visual placeholder */}
           {/* The actual browser content is rendered by Electron's WebContentsView */}
           {/* WebContentsView visibility is coordinated via IPC in main.tsx */}

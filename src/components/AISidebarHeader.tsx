@@ -1,9 +1,10 @@
 import React, { useState } from 'react'
-import { Button, Tooltip } from 'antd'
-import { HistoryOutlined, ToolOutlined, SettingOutlined } from '@ant-design/icons'
+import { Button, Tooltip, Drawer, Badge } from 'antd'
+import { HistoryOutlined, ToolOutlined, SettingOutlined, ApiOutlined } from '@ant-design/icons'
 import { useRouter } from 'next/router'
 import { HistoryPanel } from '@/components/HistoryPanel'
 import { SettingsDrawer } from '@/components/SettingsDrawer'
+import { MCPToolSelector } from '@/components/MCPToolSelector'
 import { useHistoryStore } from '@/stores/historyStore'
 import { useTranslation } from 'react-i18next'
 
@@ -12,6 +13,8 @@ export default function AISidebarHeader() {
   const { taskId, executionId } = router.query
   const { t } = useTranslation('header')
   const [showSettings, setShowSettings] = useState(false)
+  const [showMCPTools, setShowMCPTools] = useState(false)
+  const [mcpServerCount, setMCPServerCount] = useState(0)
 
   // Check if in scheduled task detail mode
   const isTaskDetailMode = !!taskId && !!executionId
@@ -82,6 +85,20 @@ export default function AISidebarHeader() {
             </Tooltip>
           )}
 
+          {/* MCP Tools button - new Phase 3 integration */}
+          <Tooltip title="MCP Tools" placement="bottom" mouseEnterDelay={0.2}>
+            <Badge count={mcpServerCount > 0 ? mcpServerCount : undefined} color="#1890ff">
+              <Button
+                type="text"
+                icon={<ApiOutlined />}
+                size="small"
+                onClick={() => setShowMCPTools(true)}
+                className="mcp-tools-button"
+                aria-label="MCP Tools Manager"
+              />
+            </Badge>
+          </Tooltip>
+
           {/* History button - icon only */}
           <Tooltip title={isTaskDetailMode ? t('execution_history') : t('history')} placement="bottom" mouseEnterDelay={0.2}>
             <Button
@@ -123,6 +140,25 @@ export default function AISidebarHeader() {
         visible={showSettings}
         onClose={() => setShowSettings(false)}
       />
+
+      {/* MCP Tools Manager Drawer */}
+      <Drawer
+        title="MCP Tools Manager"
+        placement="right"
+        onClose={() => setShowMCPTools(false)}
+        open={showMCPTools}
+        width={500}
+        bodyStyle={{ padding: 0 }}
+        className="mcp-tools-drawer"
+      >
+        <MCPToolSelector
+          onToolsUpdate={(tools) => {
+            // Count connected servers from tools
+            const serverIds = new Set(tools.map(t => t.serverId))
+            setMCPServerCount(serverIds.size)
+          }}
+        />
+      </Drawer>
 
       <style jsx>{`
         .ai-sidebar-header {
@@ -231,6 +267,24 @@ export default function AISidebarHeader() {
 
         :global(.settings-button:hover) {
           background-color: var(--mono-medium) !important;
+        }
+
+        :global(.mcp-tools-button) {
+          color: var(--text-primary-mono) !important;
+        }
+
+        :global(.mcp-tools-button:hover) {
+          background-color: var(--mono-medium) !important;
+        }
+
+        /* MCP Tools Drawer styling */
+        :global(.mcp-tools-drawer .ant-drawer-header) {
+          border-bottom: 1px solid var(--border-subtle);
+        }
+
+        :global(.mcp-tools-drawer .ant-drawer-body) {
+          background: var(--bg-primary);
+          overflow-y: auto;
         }
       `}</style>
     </div>
