@@ -5,7 +5,8 @@ import AISidebarHeader from '@/components/AISidebarHeader'
 import { BrowserPanel } from '@/components/BrowserPanel'
 import { BrowserArea } from '@/components/BrowserArea'
 import RoundedContainer from '@/components/RoundedContainer'
-import { Input, Button, App } from 'antd'
+import { Input, Button, App, Tooltip, Space } from 'antd'
+import { PauseOutlined, PlayCircleOutlined } from '@ant-design/icons'
 import { EkoResult, StreamCallbackMessage } from '@jarvis-agent/core/dist/types';
 import { MessageList } from '@/components/chat/MessageComponents';
 import { uuidv4 } from '@/common/utils';
@@ -74,6 +75,10 @@ export default function Main() {
     const [currentHistoryIndex, setCurrentHistoryIndex] = useState<number>(-1);
 
     const [ekoRequest, setEkoRequest] = useState<Promise<any> | null>(null)
+
+    // Phase 4: Checkpoint system state for pause/resume
+    const [isTaskPaused, setIsTaskPaused] = useState(false);
+    const [checkpointStatus, setCheckpointStatus] = useState<{ createdAt?: number; stateSize?: number } | null>(null);
 
     // Panel layout state management
     const [layout, setLayout] = useState<PanelLayoutState>(() => loadPersistedLayout())
@@ -800,6 +805,50 @@ export default function Main() {
         }
     };
 
+    // Phase 4: Checkpoint pause handler
+    const handlePauseTask = async () => {
+        if (!currentTaskId || !isCurrentTaskRunning) {
+            antdMessage.warning('No task running to pause');
+            return;
+        }
+
+        try {
+            const result = await (window.api as any).eko.ekoPauseTask(currentTaskId);
+            if (result.success) {
+                setIsTaskPaused(true);
+                setCheckpointStatus({ createdAt: Date.now() });
+                antdMessage.success('Task paused at checkpoint. You can resume later.');
+            } else {
+                antdMessage.error(result.error || 'Failed to pause task');
+            }
+        } catch (error) {
+            antdMessage.error('Error pausing task: ' + String(error));
+            console.error('[Checkpoint] Pause error:', error);
+        }
+    };
+
+    // Phase 4: Checkpoint resume handler
+    const handleResumeTask = async () => {
+        if (!currentTaskId || !isTaskPaused) {
+            antdMessage.warning('No paused task to resume');
+            return;
+        }
+
+        try {
+            const result = await (window.api as any).eko.ekoResumeTask(currentTaskId);
+            if (result.success) {
+                setIsTaskPaused(false);
+                setCheckpointStatus(null);
+                antdMessage.success('Task resumed from checkpoint.');
+            } else {
+                antdMessage.error(result.error || 'Failed to resume task');
+            }
+        } catch (error) {
+            antdMessage.error('Error resuming task: ' + String(error));
+            console.error('[Checkpoint] Resume error:', error);
+        }
+    };
+
     // Panel resize handler with constraint validation and WebContentsView coordination
     // Requirement 8.2: Use optimized bounds update with requestAnimationFrame
     const handleResize = useCallback(async (sizes: number[]) => {
@@ -958,7 +1007,36 @@ export default function Main() {
 
                                     {/* Send/Cancel button - only shown in non-history mode */}
                                     {!isHistoryMode && (
-                                        <div className="absolute right-3 bottom-3">
+                                        <div className="absolute right-3 bottom-3 flex gap-2 items-center">
+                                            {/* Phase 4: Pause/Resume controls when task is running */}
+                                            {isCurrentTaskRunning && (
+                                                <Space size={4}>
+                                                    {isTaskPaused ? (
+                                                        <Tooltip title="Resume task from checkpoint">
+                                                            <Button
+                                                                type="text"
+                                                                icon={<PlayCircleOutlined />}
+                                                                size="small"
+                                                                onClick={handleResumeTask}
+                                                                className="checkpoint-resume-btn"
+                                                                aria-label="Resume task"
+                                                            />
+                                                        </Tooltip>
+                                                    ) : (
+                                                        <Tooltip title="Pause task at checkpoint">
+                                                            <Button
+                                                                type="text"
+                                                                icon={<PauseOutlined />}
+                                                                size="small"
+                                                                onClick={handlePauseTask}
+                                                                className="checkpoint-pause-btn"
+                                                                aria-label="Pause task"
+                                                            />
+                                                        </Tooltip>
+                                                    )}
+                                                </Space>
+                                            )}
+
                                             {isCurrentTaskRunning ? (
                                                 <span
                                                 className='bg-ask-status rounded-md flex justify-center items-center w-7 h-7 cursor-pointer'
