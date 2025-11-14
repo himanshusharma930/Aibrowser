@@ -32,6 +32,8 @@ import { taskScheduler } from "./services/task-scheduler";
 import { windowContextManager, type WindowContext } from "./services/window-context-manager";
 import { cwd } from "node:process";
 import { registerAllIpcHandlers } from "./ipc";
+// ✅ PHASE 2: Import error handler for initialization
+import { errorHandler, ErrorCategory, ErrorSeverity } from "./utils/error-handler";
 
 /**
  * Validate and adjust bounds to ensure they're within window constraints
@@ -372,6 +374,23 @@ async function initializeMainWindow(): Promise<BrowserWindow> {
     );
     // Don't quit app - allow user to recover
   }
+
+  // ✅ PHASE 2: Initialize error handler system
+  errorHandler;  // Force initialization of singleton
+  console.log('[ErrorHandler] Centralized error handler initialized');
+
+  // Register error callbacks for critical errors
+  errorHandler.onError(ErrorCategory.IPC, (error) => {
+    if (error.severity === ErrorSeverity.CRITICAL) {
+      console.error('[ErrorHandler] Critical IPC error:', error.message);
+    }
+  });
+
+  errorHandler.onError(ErrorCategory.AGENT, (error) => {
+    if (error.severity === ErrorSeverity.CRITICAL) {
+      console.error('[ErrorHandler] Critical agent error:', error.message);
+    }
+  });
 
   // Register all IPC handlers FIRST (before creating windows)
   registerAllIpcHandlers();

@@ -37,6 +37,7 @@ export enum ErrorCategory {
  * Structured error information
  */
 export interface ErrorInfo {
+  id?: string;                       // Unique error identifier
   category: ErrorCategory;
   severity: ErrorSeverity;
   message: string;
@@ -109,6 +110,7 @@ export class ErrorHandler {
     isRecoverable: boolean = false
   ): ErrorInfo {
     const errorInfo: ErrorInfo = {
+      id: `err_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       category,
       severity,
       message: error instanceof Error ? error.message : error,
@@ -345,13 +347,6 @@ export class ErrorHandler {
   }
 
   /**
-   * Get errors by severity
-   */
-  public getErrorsBySeverity(severity: ErrorSeverity): ErrorInfo[] {
-    return this.errorLog.filter(e => e.severity === severity);
-  }
-
-  /**
    * Clear error log
    */
   public clearLog(): void {
@@ -361,23 +356,96 @@ export class ErrorHandler {
   /**
    * Export error report
    */
-  public exportErrorReport(): string {
-    return JSON.stringify(
-      {
-        timestamp: new Date().toISOString(),
+  public exportErrorReport(): {
+    timestamp: string;
+    stats: {
+      totalErrors: number;
+      highestSeverity: ErrorSeverity;
+      mostCommonCategory: ErrorCategory;
+      bySeverity: Record<string, number>;
+      byCategory: Record<string, number>;
+    };
+    errors: ErrorInfo[];
+  } {
+    const bySeverity = {
+      critical: this.getErrorsBySeverity(ErrorSeverity.CRITICAL).length,
+      high: this.getErrorsBySeverity(ErrorSeverity.HIGH).length,
+      medium: this.getErrorsBySeverity(ErrorSeverity.MEDIUM).length,
+      low: this.getErrorsBySeverity(ErrorSeverity.LOW).length
+    };
+
+    // Calculate most common category
+    const categoryCount: Record<string, number> = {};
+    this.errorLog.forEach(error => {
+      categoryCount[error.category] = (categoryCount[error.category] || 0) + 1;
+    });
+
+    const mostCommonCategory = Object.entries(categoryCount)
+      .sort(([, a], [, b]) => b - a)[0]?.[0] as ErrorCategory || ErrorCategory.UNKNOWN;
+
+    // Find highest severity
+    let highestSeverity = ErrorSeverity.LOW;
+    if (bySeverity.critical > 0) highestSeverity = ErrorSeverity.CRITICAL;
+    else if (bySeverity.high > 0) highestSeverity = ErrorSeverity.HIGH;
+    else if (bySeverity.medium > 0) highestSeverity = ErrorSeverity.MEDIUM;
+
+    return {
+      timestamp: new Date().toISOString(),
+      stats: {
         totalErrors: this.errorLog.length,
-        bySeverity: {
-          critical: this.getErrorsBySeverity(ErrorSeverity.CRITICAL).length,
-          high: this.getErrorsBySeverity(ErrorSeverity.HIGH).length,
-          medium: this.getErrorsBySeverity(ErrorSeverity.MEDIUM).length,
-          low: this.getErrorsBySeverity(ErrorSeverity.LOW).length
-        },
-        errors: this.errorLog
+        highestSeverity,
+        mostCommonCategory,
+        bySeverity,
+        byCategory: categoryCount
       },
-      null,
-      2
-    );
+      errors: this.errorLog
+    };
   }
+
+  /**
+   * Get total error count
+   */
+  public getTotalErrorCount(): number {
+    return this.errorLog.length;
+  }
+
+  /**
+   * Get errors count by category
+   */
+  public getErrorsCountByCategory(): Record<string, number> {
+    const counts: Record<string, number> = {};
+    this.errorLog.forEach(error => {
+      counts[error.category] = (counts[error.category] || 0) + 1;
+    });
+    return counts;
+  }
+
+  /**
+   * Get error info by ID
+   */
+  public getErrorInfo(errorId: string): ErrorInfo | undefined {
+    return this.errorLog.find(e => e.id === errorId);
+  }
+
+  /**
+   * Clear all error logs and return count
+   */
+  public clearLogs(): number {
+    const count = this.errorLog.length;
+    this.errorLog = [];
+    return count;
+  }
+
+  /**
+   * Get errors by severity (public overload without parameters returns all by severity)
+   */
+  public getErrorsBySeverity(severity?: ErrorSeverity): ErrorInfo[] {
+    if (severity === undefined) {
+      return this.errorLog;
+    }
+    return this.errorLog.filter(e => e.severity === severity);
+  }
+
 }
 
 /**

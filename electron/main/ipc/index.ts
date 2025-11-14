@@ -5,6 +5,7 @@ import { registerConfigHandlers } from "./config-handlers";
 import { registerAgentHandlers } from "./agent-handlers";
 import { setupAgentContextHandlers } from "./agent-context-handlers";
 import { setupMCPHandlers } from "./mcp-tools";
+import { registerErrorHandlers } from "./error-handlers";
 
 /**
  * Register all IPC handlers
@@ -18,6 +19,7 @@ export function registerAllIpcHandlers() {
   registerAgentHandlers();
   setupAgentContextHandlers();
   setupMCPHandlers();
+  registerErrorHandlers();
 
   console.log('[IPC] All IPC handlers registered successfully');
 }
@@ -30,5 +32,6 @@ export {
   registerConfigHandlers,
   registerAgentHandlers,
   setupAgentContextHandlers,
-  setupMCPHandlers
+  setupMCPHandlers,
+  registerErrorHandlers
 };
