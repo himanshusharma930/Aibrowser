@@ -5,8 +5,13 @@ directories:
   output: release
 files:
   - .next/**/*
+  - "!.next/cache/**/*"
   - package.json
   - node_modules/**/*
+  - "!node_modules/**/istanbul-lib-instrument/**"
+  - "!node_modules/**/@jest/**"
+  - "!node_modules/**/babel-plugin-istanbul/**"
+  - "!node_modules/**/jest-*/**"
   - assets/**/*
   - dist/**/*
   - public/**/*
@@ -20,10 +25,14 @@ files:
 
 extraMetadata:
   main: dist/electron/main/index.mjs
+asar:
+  smartUnpack: true
 asarUnpack:
-  - electron-update.yml
-  - node_modules/sharp/**/*
-  - node_modules/semver/**/*
+  - "**/*.node"
+  - "node_modules/sharp"
+  - "node_modules/semver"
+  - "node_modules/@img"
+  - "node_modules/detect-libc"
 
 mac:
   icon: assets/icons/logo.png

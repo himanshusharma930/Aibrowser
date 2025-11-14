@@ -12,6 +12,7 @@
     "electron": "electron ./dist/electron/main/index.mjs",
     "build:next": "next build && tsc --project tsconfig.server.json --outDir ./",
     "start": "next start",
+    "prebuild:electron": "node scripts/clean-dependencies.js",
     "build:electron": "electron-builder",
     "build:deps": "concurrently \"ENTRY=index vite build --config electron/preload/vite.config.ts\" \"ENTRY=view vite build --config electron/preload/vite.config.ts\" \"vite build --config electron/main/vite.config.ts\"",
     "build:deps:win": "concurrently \"set ENTRY=index&& vite build --config electron/preload/vite.config.ts\" \"set ENTRY=view&& vite build --config electron/preload/vite.config.ts\" \"vite build --config electron/main/vite.config.ts\"",

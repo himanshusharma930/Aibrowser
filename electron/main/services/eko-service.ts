@@ -9,6 +9,8 @@ import { agentContextManager } from "./agent-context-manager";
 // ✅ PHASE 2: Import centralized logging and error handling
 import { createLogger } from "../utils/logger";
 import { ErrorCategory, ErrorSeverity } from "../utils/error-handler";
+import { IPCBatchManager } from "./ipc-batch-manager";
+import { DEFAULT_BATCH_CONFIG } from "../types/ipc-batching";
 // Phase 1, 2 & 3: Import browser tools
 import {
   browserGetMarkdownTool,
@@ -78,6 +80,7 @@ export class EkoService {
   constructor(mainWindow: BrowserWindow, detailView: WebContentsView) {
     this.mainWindow = mainWindow;
     this.detailView = detailView;
+    this.batchManager = new IPCBatchManager(DEFAULT_BATCH_CONFIG);
     this.initializeEko();
   }
 
@@ -98,7 +101,7 @@ export class EkoService {
 
         return new Promise((resolve) => {
            // Send stream message to renderer process via IPC
-        this.mainWindow.webContents.send('eko-stream-message', message);
+        this.batchManager.addMessage('eko-stream-message', message, this.mainWindow.webContents);
 
         // When file is modified, main view window loads file content display page
         if (message.type === 'tool_streaming' && message.toolName === 'file_write') {
