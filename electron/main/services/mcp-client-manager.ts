@@ -13,6 +13,9 @@
 
 import { Log } from '@jarvis-agent/core';
 import type { Agent } from '@jarvis-agent/eko';
+// ✅ PHASE 2: Import centralized logging
+import { createLogger } from "../utils/logger";
+import { ErrorCategory, ErrorSeverity } from "../utils/error-handler";
 
 export interface MCPServer {
   id: string;
@@ -65,13 +68,21 @@ class MCPClientManagerService {
   private readonly TOOL_CACHE_TTL = 60 * 60 * 1000; // 1 hour
   private readonly RECONNECT_INTERVAL = 5 * 60 * 1000; // 5 minutes
   private reconnectTimers: Map<string, NodeJS.Timeout> = new Map();
+  // ✅ PHASE 2: Add logger instance
+  private logger = createLogger('MCPClientManager');
 
   /**
    * Register an MCP server configuration
    */
   async registerServer(server: MCPServer): Promise<void> {
     this.servers.set(server.id, server);
-    Log.info(`[MCP] Registered server: ${server.name} (${server.url})`);
+    // ✅ PHASE 2: Use logger for server registration
+    this.logger.info('MCP server registered', {
+      serverId: server.id,
+      serverName: server.name,
+      url: server.url,
+      connectionType: server.connectionType
+    });
 
     if (server.enabled) {
       await this.connectToServer(server.id);
@@ -98,7 +109,8 @@ class MCPClientManagerService {
   async connectToServer(serverId: string): Promise<boolean> {
     const server = this.servers.get(serverId);
     if (!server) {
-      Log.warn(`[MCP] Server not found: ${serverId}`);
+      // ✅ PHASE 2: Use logger for server not found
+      this.logger.warn('MCP server not found', { serverId }, ErrorCategory.CONFIG, ErrorSeverity.MEDIUM, false);
       return false;
     }
 
@@ -131,7 +143,12 @@ class MCPClientManagerService {
         this.toolRegistry.set(`${serverId}:${tool.name}`, tool);
       }
 
-      Log.info(`[MCP] Connected to ${server.name}, discovered ${tools.length} tools`);
+      // ✅ PHASE 2: Use logger for successful connection
+      this.logger.info('Connected to MCP server', {
+        serverId: server.id,
+        serverName: server.name,
+        toolCount: tools.length
+      });
 
       // Clear retry timer if exists
       const timer = this.reconnectTimers.get(serverId);
@@ -142,7 +159,15 @@ class MCPClientManagerService {
 
       return true;
     } catch (error: any) {
-      Log.error(`[MCP] Failed to connect to ${server.name}:`, error);
+      // ✅ PHASE 2: Use logger for connection failure
+      this.logger.error(
+        'Failed to connect to MCP server',
+        error,
+        { serverId, serverName: server.name },
+        ErrorCategory.NETWORK,
+        ErrorSeverity.MEDIUM,
+        true // recoverable - will retry
+      );
 
       const clientInstance = this.clients.get(serverId);
       if (clientInstance) {
@@ -167,7 +192,13 @@ class MCPClientManagerService {
 
     const clientInstance = this.clients.get(serverId);
     if (clientInstance && clientInstance.retryCount >= this.MAX_RETRY_ATTEMPTS) {
-      Log.warn(`[MCP] Max retries reached for ${server.name}, will retry in ${this.RECONNECT_INTERVAL}ms`);
+      // ✅ PHASE 2: Use logger for max retries
+      this.logger.warn('Max MCP reconnection retries reached', {
+        serverId,
+        serverName: server.name,
+        retryCount: clientInstance.retryCount,
+        nextRetryIn: `${this.RECONNECT_INTERVAL}ms`
+      });
     }
 
     // Clear existing timer if any
@@ -179,7 +210,15 @@ class MCPClientManagerService {
     // Schedule new reconnection
     const timer = setTimeout(() => {
       this.connectToServer(serverId).catch(error => {
-        Log.error(`[MCP] Reconnection failed for ${server.name}:`, error);
+        // ✅ PHASE 2: Use logger for reconnection failure
+        this.logger.error(
+          'MCP server reconnection failed',
+          error as Error,
+          { serverId, serverName: server.name },
+          ErrorCategory.NETWORK,
+          ErrorSeverity.MEDIUM,
+          true // recoverable - will retry next interval
+        );
       });
     }, this.RECONNECT_INTERVAL);
 
@@ -200,18 +239,34 @@ class MCPClientManagerService {
       } else if (server.connectionType === 'stdio') {
         // Standard Input/Output (process-based)
         // Would require spawning subprocess and managing lifecycle
-        Log.warn(`[MCP] STDIO connections not yet implemented: ${server.name}`);
+        // ✅ PHASE 2: Use logger for unimplemented connection type
+        this.logger.warn('MCP STDIO connection type not implemented', {
+          serverId: server.id,
+          serverName: server.name
+        });
         return null;
       } else if (server.connectionType === 'websocket') {
         // WebSocket (bidirectional)
         // Would require WebSocket client implementation
-        Log.warn(`[MCP] WebSocket connections not yet implemented: ${server.name}`);
+        // ✅ PHASE 2: Use logger for unimplemented connection type
+        this.logger.warn('MCP WebSocket connection type not implemented', {
+          serverId: server.id,
+          serverName: server.name
+        });
         return null;
       }
 
       return null;
     } catch (error: any) {
-      Log.error(`[MCP] Error initializing client for ${server.name}:`, error);
+      // ✅ PHASE 2: Use logger for client initialization error
+      this.logger.error(
+        'Error initializing MCP client',
+        error,
+        { serverId: server.id, serverName: server.name, connectionType: server.connectionType },
+        ErrorCategory.NETWORK,
+        ErrorSeverity.HIGH,
+        true // recoverable - can retry
+      );
       return null;
     }
   }
@@ -226,7 +281,12 @@ class MCPClientManagerService {
       const response = await client.callTool('list_tools', {});
 
       if (!response || !Array.isArray(response.tools)) {
-        Log.warn(`[MCP] Invalid tool list response from ${server.name}`);
+        // ✅ PHASE 2: Use logger for invalid response
+        this.logger.warn('Invalid MCP tool list response', {
+          serverId: server.id,
+          serverName: server.name,
+          responseType: typeof response
+        });
         return [];
       }
 
@@ -246,7 +306,15 @@ class MCPClientManagerService {
 
       return tools;
     } catch (error: any) {
-      Log.error(`[MCP] Error discovering tools from ${server.name}:`, error);
+      // ✅ PHASE 2: Use logger for tool discovery error
+      this.logger.error(
+        'Error discovering MCP tools',
+        error,
+        { serverId: server.id, serverName: server.name },
+        ErrorCategory.NETWORK,
+        ErrorSeverity.MEDIUM,
+        true // recoverable - will retry on reconnect
+      );
       return [];
     }
   }
@@ -345,10 +413,23 @@ class MCPClientManagerService {
         }
       }
 
-      Log.info(`[MCP] Registered ${toolsRegistered} tools with agent ${agent.name}`);
+      // ✅ PHASE 2: Use logger for tool registration
+      this.logger.info('MCP tools registered with agent', {
+        agentName: agent.name,
+        toolsRegistered,
+        totalServerIds: serverIds?.length || 'all'
+      });
       return toolsRegistered;
     } catch (error: any) {
-      Log.error(`[MCP] Error registering tools with agent:`, error);
+      // ✅ PHASE 2: Use logger for registration error
+      this.logger.error(
+        'Error registering MCP tools with agent',
+        error,
+        { agentName: agent.name, serverIds },
+        ErrorCategory.AGENT,
+        ErrorSeverity.MEDIUM,
+        true // recoverable - can retry
+      );
       return 0;
     }
   }
@@ -413,9 +494,22 @@ class MCPClientManagerService {
       }
 
       this.clients.delete(serverId);
-      Log.info(`[MCP] Disconnected from ${clientInstance.serverName}`);
+      // ✅ PHASE 2: Use logger for disconnection
+      this.logger.info('Disconnected from MCP server', {
+        serverId,
+        serverName: clientInstance.serverName,
+        toolsRemoved: clientInstance.tools.size
+      });
     } catch (error: any) {
-      Log.error(`[MCP] Error disconnecting from ${clientInstance.serverName}:`, error);
+      // ✅ PHASE 2: Use logger for disconnection error
+      this.logger.error(
+        'Error disconnecting from MCP server',
+        error,
+        { serverId, serverName: clientInstance.serverName },
+        ErrorCategory.NETWORK,
+        ErrorSeverity.MEDIUM,
+        true // recoverable - will reconnect if needed
+      );
     }
 
     // Clear retry timer
@@ -442,16 +536,32 @@ class MCPClientManagerService {
   async executeTool(toolId: string, args: Record<string, any>): Promise<any> {
     const tool = this.toolRegistry.get(toolId);
     if (!tool) {
+      // ✅ PHASE 2: Use logger for tool not found
+      this.logger.warn('MCP tool not found', { toolId }, ErrorCategory.CONFIG, ErrorSeverity.MEDIUM, false);
       throw new Error(`Tool not found: ${toolId}`);
     }
 
     const clientInstance = this.clients.get(tool.serverId);
     if (!clientInstance || !clientInstance.isConnected) {
+      // ✅ PHASE 2: Use logger for server not connected
+      this.logger.warn('MCP server not connected for tool execution', {
+        toolId,
+        toolName: tool.name,
+        serverId: tool.serverId,
+        serverName: tool.serverName
+      }, ErrorCategory.NETWORK, ErrorSeverity.MEDIUM, false);
       throw new Error(`MCP server ${tool.serverName} is not connected`);
     }
 
     try {
       const result = await clientInstance.client.callTool(tool.name, args);
+      // ✅ PHASE 2: Use logger for successful tool execution
+      this.logger.debug('MCP tool executed successfully', {
+        toolId,
+        toolName: tool.name,
+        serverId: tool.serverId,
+        resultSize: JSON.stringify(result).length
+      });
       return {
         success: true,
         data: result,
@@ -463,6 +573,15 @@ class MCPClientManagerService {
         },
       };
     } catch (error: any) {
+      // ✅ PHASE 2: Use logger for tool execution error
+      this.logger.error(
+        'MCP tool execution failed',
+        error,
+        { toolId, toolName: tool.name, serverId: tool.serverId },
+        ErrorCategory.AGENT,
+        ErrorSeverity.MEDIUM,
+        true // recoverable - can retry
+      );
       return {
         success: false,
         error: error.message,
@@ -493,7 +612,13 @@ class MCPClientManagerService {
     }
 
     const total = healthy + unhealthy;
-    Log.info(`[MCP] Health check: ${healthy}/${total} servers healthy`);
+    // ✅ PHASE 2: Use logger for health check results
+    this.logger.info('MCP health check completed', {
+      healthy,
+      unhealthy,
+      total,
+      healthPercentage: total > 0 ? Math.round((healthy / total) * 100) : 0
+    });
 
     return { healthy, unhealthy, total };
   }

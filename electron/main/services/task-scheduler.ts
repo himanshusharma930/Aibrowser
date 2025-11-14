@@ -1,5 +1,8 @@
 import { taskWindowManager } from "./task-window-manager";
 import { ipcMain } from "electron";
+// ✅ PHASE 2: Import centralized logging
+import { createLogger } from "../utils/logger";
+import { ErrorCategory, ErrorSeverity } from "../utils/error-handler";
 
 /**
  * Scheduled task queue item
@@ -31,6 +34,8 @@ export class TaskScheduler {
   private scheduledTimers: Map<string, NodeJS.Timeout> = new Map(); // Timer mapping
   private isRunning: boolean = false;
   private isInitialized: boolean = false; // Flag if initialized from storage
+  // ✅ PHASE 2: Add logger instance
+  private logger = createLogger('TaskScheduler');
 
   constructor() {
     this.setupIpcHandlers();
@@ -93,11 +98,17 @@ export class TaskScheduler {
    */
   start(): { success: boolean; message: string } {
     if (this.isRunning) {
+      // ✅ PHASE 2: Use logger for duplicate start attempt
+      this.logger.warn('Scheduler start attempted but already running', {});
       return { success: false, message: 'Scheduler is already running' };
     }
 
     this.isRunning = true;
-    console.log('[TaskScheduler] Scheduler started');
+    // ✅ PHASE 2: Use logger for scheduler start
+    this.logger.info('Task scheduler started', {
+      taskQueueSize: this.taskQueue.length,
+      scheduledTimersCount: this.scheduledTimers.size
+    });
 
     return { success: true, message: 'Scheduler started successfully' };
   }
@@ -107,20 +118,29 @@ export class TaskScheduler {
    */
   stop(): { success: boolean; message: string } {
     if (!this.isRunning) {
+      // ✅ PHASE 2: Use logger for stop when not running
+      this.logger.warn('Scheduler stop attempted but not running', {});
       return { success: false, message: 'Scheduler is not running' };
     }
 
     // Clear all timers
+    let clearedCount = 0;
     this.scheduledTimers.forEach((timer) => {
       clearTimeout(timer);
+      clearedCount++;
     });
     this.scheduledTimers.clear();
 
     // Clear queue
+    const queueSize = this.taskQueue.length;
     this.taskQueue = [];
 
     this.isRunning = false;
-    console.log('[TaskScheduler] Scheduler stopped');
+    // ✅ PHASE 2: Use logger for scheduler stop
+    this.logger.info('Task scheduler stopped', {
+      timersCleared: clearedCount,
+      queuedTasksCleared: queueSize
+    });
 
     return { success: true, message: 'Scheduler stopped successfully' };
   }
@@ -131,6 +151,11 @@ export class TaskScheduler {
    */
   scheduleTask(task: any): { success: boolean; message: string; nextExecuteAt?: Date } {
     if (!this.isRunning) {
+      // ✅ PHASE 2: Use logger for scheduler not running
+      this.logger.warn('Schedule task attempted but scheduler not running', {
+        taskId: task.id,
+        taskName: task.name
+      });
       return { success: false, message: 'Scheduler not started' };
     }
 
@@ -140,6 +165,15 @@ export class TaskScheduler {
     const nextExecuteAt = this.calculateNextExecuteTime(schedule);
 
     if (!nextExecuteAt) {
+      // ✅ PHASE 2: Use logger for invalid schedule
+      this.logger.error(
+        'Invalid schedule configuration',
+        new Error('Cannot calculate next execution time'),
+        { taskId: id, taskName: name, schedule },
+        ErrorCategory.CONFIG,
+        ErrorSeverity.MEDIUM,
+        false // non-recoverable - user must fix schedule
+      );
       return { success: false, message: 'Invalid schedule configuration' };
     }
 
@@ -147,6 +181,12 @@ export class TaskScheduler {
     const delay = nextExecuteAt.getTime() - Date.now();
 
     if (delay < 0) {
+      // ✅ PHASE 2: Use logger for expired execution time
+      this.logger.warn('Calculated execution time has expired', {
+        taskId: id,
+        taskName: name,
+        calculatedTime: nextExecuteAt.toISOString()
+      });
       return { success: false, message: 'Calculated execution time has expired' };
     }
 
@@ -154,7 +194,11 @@ export class TaskScheduler {
     const existingTimer = this.scheduledTimers.get(id);
     if (existingTimer) {
       clearTimeout(existingTimer);
-      console.log(`[TaskScheduler] Cleared old timer for task ${name} to avoid duplicate execution`);
+      // ✅ PHASE 2: Use logger for timer replacement
+      this.logger.debug('Replaced existing task schedule', {
+        taskId: id,
+        taskName: name
+      });
     }
 
     // Create timer
@@ -171,7 +215,14 @@ export class TaskScheduler {
     // Save timer
     this.scheduledTimers.set(id, timer);
 
-    console.log(`[TaskScheduler] Task ${name} scheduled, next execution time: ${nextExecuteAt.toLocaleString()}`);
+    // ✅ PHASE 2: Use logger for task scheduled
+    this.logger.info('Task scheduled', {
+      taskId: id,
+      taskName: name,
+      scheduleType: schedule.type,
+      nextExecuteAt: nextExecuteAt.toISOString(),
+      delayMs: delay
+    });
 
     return { success: true, message: 'Task scheduled successfully', nextExecuteAt };
   }
@@ -184,15 +235,18 @@ export class TaskScheduler {
     const timer = this.scheduledTimers.get(taskId);
 
     if (!timer) {
+      // ✅ PHASE 2: Use logger for task not found
+      this.logger.warn('Attempted to remove non-existent task schedule', { taskId });
       return { success: false, message: 'Task schedule not found' };
     }
 
     clearTimeout(timer);
     this.scheduledTimers.delete(taskId);
 
-    console.log(`[TaskScheduler] Task ${taskId} schedule removed`);
+    // ✅ PHASE 2: Use logger for task removal
+    this.logger.info('Task schedule removed', { taskId });
 
-    return { success: true, message: 'Task schedule removed' };
+    return { success: true, message: 'Task schedule removed successfully' };
   }
 
   /**
@@ -226,7 +280,13 @@ export class TaskScheduler {
           scheduledTime: new Date()
         });
 
-        console.log(`[TaskScheduler] Task ${taskName} added to queue, current running tasks: ${taskWindowManager.getRunningTaskCount()}`);
+        // ✅ PHASE 2: Use logger for queue addition
+        this.logger.debug('Task queued due to concurrency limit', {
+          taskId,
+          taskName,
+          queueSize: this.taskQueue.length,
+          runningTasks: taskWindowManager.getRunningTaskCount()
+        });
 
         return { success: true, message: 'Task added to queue' };
       }
@@ -237,7 +297,15 @@ export class TaskScheduler {
 
       return { success: true, message: 'Task execution started', executionId };
     } catch (error: any) {
-      console.error('[TaskScheduler] Failed to execute task:', error);
+      // ✅ PHASE 2: Use logger for task execution error
+      this.logger.error(
+        'Task execution failed',
+        error,
+        { taskId, taskName, stepCount: steps.length },
+        ErrorCategory.AGENT,
+        ErrorSeverity.HIGH,
+        true // recoverable - can retry task
+      );
       return { success: false, message: error.message };
     }
   }
@@ -252,7 +320,13 @@ export class TaskScheduler {
     executionId: string
   ): Promise<void> {
     try {
-      console.log(`[TaskScheduler] Starting task execution: ${taskName} (${executionId})`);
+      // ✅ PHASE 2: Use logger for task execution start
+      this.logger.info('Task execution started', {
+        taskId,
+        taskName,
+        executionId,
+        stepCount: steps.length
+      });
 
       // Create task-dedicated window
       const { window, ekoService } = await taskWindowManager.createTaskWindow(taskId, executionId);
@@ -278,7 +352,13 @@ export class TaskScheduler {
       // Execute task
       const result = await ekoService.run(taskPrompt);
 
-      console.log(`[TaskScheduler] Task execution completed: ${taskName}`, result?.stopReason);
+      // ✅ PHASE 2: Use logger for task completion
+      this.logger.info('Task execution completed', {
+        taskId,
+        taskName,
+        executionId,
+        stopReason: result?.stopReason || 'done'
+      });
 
       // Notify renderer process task completion, save execution history
       window.webContents.send('task-execution-complete', {
@@ -296,8 +376,16 @@ export class TaskScheduler {
       // Process next task in queue
       this.processQueue();
 
-    } catch (error) {
-      console.error('[TaskScheduler] Task execution failed:', error);
+    } catch (error: any) {
+      // ✅ PHASE 2: Use logger for task execution error
+      this.logger.error(
+        'Task execution failed',
+        error,
+        { taskId, taskName, executionId, stepCount: steps.length },
+        ErrorCategory.AGENT,
+        ErrorSeverity.HIGH,
+        true // recoverable - will be retried if in queue
+      );
 
       // No longer auto-close window, let user view error info
       // Remove from running tasks list
