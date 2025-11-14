@@ -489,16 +489,33 @@ export class EkoService {
   async execute(taskId: string): Promise<EkoResult | null> {
     if (!this.eko) {
       const errorMsg = 'Eko service not initialized';
-      Log.error(errorMsg);
+      // ✅ PHASE 2: Use logger for initialization errors
+      this.logger.error(
+        errorMsg,
+        new Error(errorMsg),
+        { taskId },
+        ErrorCategory.AGENT,
+        ErrorSeverity.CRITICAL,
+        false
+      );
       this.sendErrorToFrontend(errorMsg, undefined, taskId);
       return null;
     }
 
-    console.log('EkoService executing task:', taskId);
+    // ✅ PHASE 2: Use logger instead of console.log
+    this.logger.info('Executing task', { taskId });
     try {
       return await this.eko.execute(taskId);
     } catch (error: any) {
-      Log.error('EkoService execute error:', error);
+      // ✅ PHASE 2: Detailed error logging for task execution
+      this.logger.error(
+        'Failed to execute task',
+        error,
+        { taskId },
+        ErrorCategory.AGENT,
+        ErrorSeverity.MEDIUM,
+        true
+      );
       const errorMessage = error?.message || error?.toString() || 'Failed to execute task';
       this.sendErrorToFrontend(errorMessage, error, taskId);
       return null;
@@ -510,12 +527,27 @@ export class EkoService {
    */
   async getTaskStatus(taskId: string): Promise<any> {
     if (!this.eko) {
+      // ✅ PHASE 2: Use logger for initialization errors
+      this.logger.error(
+        'Eko service not initialized',
+        new Error('Cannot get task status'),
+        { taskId },
+        ErrorCategory.AGENT,
+        ErrorSeverity.CRITICAL,
+        false
+      );
       throw new Error('Eko service not initialized');
     }
 
     // ✅ Return tracked task status (P0.8)
     const trackedTask = this.taskStatus.get(taskId);
     if (trackedTask) {
+      // ✅ PHASE 2: Log task status retrieval
+      this.logger.debug('Task status retrieved from tracking', {
+        taskId,
+        status: trackedTask.status,
+        progress: trackedTask.progress
+      });
       return {
         taskId,
         status: trackedTask.status,
@@ -527,7 +559,7 @@ export class EkoService {
     }
 
     // Fallback for tasks not in our map (legacy or external tasks)
-    console.log('EkoService getting task status:', taskId);
+    this.logger.debug('Task status not found in tracking, returning unknown', { taskId });
     return {
       taskId,
       status: 'unknown',
@@ -540,11 +572,37 @@ export class EkoService {
    */
   async cancelTask(taskId: string): Promise<any> {
     if (!this.eko) {
+      // ✅ PHASE 2: Use logger for initialization errors
+      this.logger.error(
+        'Eko service not initialized',
+        new Error('Cannot cancel task'),
+        { taskId },
+        ErrorCategory.AGENT,
+        ErrorSeverity.CRITICAL,
+        false
+      );
       throw new Error('Eko service not initialized');
     }
 
-    const res = await this.eko.abortTask(taskId, 'cancel');
-    return res;
+    try {
+      this.logger.info('Cancelling task', { taskId });
+      const res = await this.eko.abortTask(taskId, 'cancel');
+
+      // ✅ PHASE 2: Log successful cancellation
+      this.logger.info('Task cancelled successfully', { taskId });
+      return res;
+    } catch (error: any) {
+      // ✅ PHASE 2: Log task cancellation errors
+      this.logger.error(
+        'Failed to cancel task',
+        error,
+        { taskId },
+        ErrorCategory.AGENT,
+        ErrorSeverity.MEDIUM,
+        true
+      );
+      throw error;
+    }
   }
 
   /**
@@ -578,10 +636,25 @@ export class EkoService {
     }
 
     const allTaskIds = this.eko.getAllTaskId();
-    const abortPromises = allTaskIds.map(taskId => this.eko!.abortTask(taskId, 'window-closing'));
+    // ✅ PHASE 2: Log task abort operations
+    this.logger.info('Aborting all running tasks', { count: allTaskIds.length });
 
-    await Promise.all(abortPromises);
-    Log.info('All tasks aborted');
+    try {
+      const abortPromises = allTaskIds.map(taskId => this.eko!.abortTask(taskId, 'window-closing'));
+      await Promise.all(abortPromises);
+
+      this.logger.info('All tasks aborted successfully', { taskCount: allTaskIds.length });
+    } catch (error: any) {
+      // ✅ PHASE 2: Log errors during mass abort
+      this.logger.error(
+        'Error aborting all tasks',
+        error,
+        { taskCount: allTaskIds.length },
+        ErrorCategory.AGENT,
+        ErrorSeverity.MEDIUM,
+        true
+      );
+    }
   }
 
   /**
@@ -595,18 +668,33 @@ export class EkoService {
   ): Promise<{ id: string; promise: Promise<any> }> {
     if (!this.eko) {
       const errorMsg = 'Eko service not initialized';
-      Log.error(errorMsg);
+      // ✅ PHASE 2: Use logger for initialization errors
+      this.logger.error(
+        errorMsg,
+        new Error(errorMsg),
+        { hasCheckpoint: true },
+        ErrorCategory.AGENT,
+        ErrorSeverity.CRITICAL,
+        false
+      );
       this.sendErrorToFrontend(errorMsg);
       throw new Error(errorMsg);
     }
 
     const taskId = `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const windowId = this.mainWindow.webContents.id;
-    Log.info(`[Checkpoint] Starting task ${taskId} with checkpoint interval ${checkpointInterval}`);
+    // ✅ PHASE 2: Log checkpoint initialization
+    this.logger.info('Starting task with checkpoint support', {
+      taskId,
+      checkpointInterval,
+      windowId,
+      agentCount: agents?.length || 0
+    });
 
-    // Phase 2: Initialize agent context for this window
-    await agentContextManager.initializeWindowContext(windowId);
-    Log.info(`[Checkpoint] Initialized agent context for window ${windowId}, task ${taskId}`);
+    try {
+      // Phase 2: Initialize agent context for this window
+      await agentContextManager.initializeWindowContext(windowId);
+      this.logger.debug('Agent context initialized for checkpoint task', { windowId, taskId });
 
     const executionPromise = (async () => {
       try {

@@ -538,4 +538,37 @@ export class ConfigManager {
       .filter(([_, config]) => config.enabled)
       .map(([name, _]) => name);
   }
+
+  // ✅ URL Configuration Methods (P0.5)
+  /**
+   * Get file view URL endpoint
+   * Used for displaying file content from agent tasks
+   */
+  public getFileViewUrl(): string {
+    return process.env.NEXT_PUBLIC_FILE_VIEW_URL || `http://localhost:${this.getDevPort()}/file-view`;
+  }
+
+  /**
+   * Get MCP SSE URL endpoint
+   * Used for Model Context Protocol streaming
+   */
+  public getMcpSseUrl(): string {
+    return process.env.NEXT_PUBLIC_MCP_SSE_URL || `http://localhost:${this.getDevPort()}/api/mcp/sse`;
+  }
+
+  /**
+   * Get task window base URL
+   * Used for creating new task execution windows
+   */
+  public getTaskWindowUrl(): string {
+    return process.env.NEXT_PUBLIC_TASK_WINDOW_URL || `http://localhost:${this.getDevPort()}/main`;
+  }
+
+  /**
+   * Get development port
+   * Used for all localhost URLs in development
+   */
+  public getDevPort(): string {
+    return process.env.NEXT_DEV_PORT || '5173';
+  }
 }

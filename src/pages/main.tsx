@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/router'
 import { PanelGroup, Panel, PanelResizeHandle } from 'react-resizable-panels'
 import AISidebarHeader from '@/components/AISidebarHeader'
-import { BrowserPanel } from '@/components/BrowserPanel'
 import { BrowserArea } from '@/components/BrowserArea'
 import RoundedContainer from '@/components/RoundedContainer'
 import { Input, Button, App, Tooltip, Space } from 'antd'
@@ -12,8 +11,6 @@ import { MessageList } from '@/components/chat/MessageComponents';
 import { uuidv4 } from '@/common/utils';
 import { SendMessage, CancleTask } from '@/icons/deepfundai-icons';
 import { Task, ToolAction } from '@/models';
-import { CurrentToolState } from '@/types/tool';
-import { DETAIL_PANEL_AGENTS } from '@/constants/agents';
 import { MessageProcessor } from '@/utils/messageTransform';
 import { useTaskManager } from '@/hooks/useTaskManager';
 import { useHistoryStore } from '@/stores/historyStore';
@@ -60,19 +57,12 @@ export default function Main() {
     // Use Zustand history state management
     const { selectedHistoryTask, clearSelectedHistoryTask, setTerminateCurrentTaskFn } = useHistoryStore();
 
-    const [showDetail, setShowDetail] = useState(false);
     const [query, setQuery] = useState('');
     const [currentUrl, setCurrentUrl] = useState<string>('');
     // Navigation state for browser controls
     const [canGoBack, setCanGoBack] = useState(false);
     const [canGoForward, setCanGoForward] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
-    // Current tool information state
-    const [currentTool, setCurrentTool] = useState<CurrentToolState | null>(null);
-    // Tool call history
-    const [toolHistory, setToolHistory] = useState<(ToolAction & { screenshot?: string, toolSequence?: number })[]>([]);
-    // Current displayed history tool index, -1 means showing the latest detail panel
-    const [currentHistoryIndex, setCurrentHistoryIndex] = useState<number>(-1);
 
     const [ekoRequest, setEkoRequest] = useState<Promise<any> | null>(null)
 
@@ -470,70 +460,9 @@ export default function Main() {
         }
     }, [messages, isAtBottom, isUserScrolling]);
 
-    // Get tool operation description
-    const getToolOperation = (message: StreamCallbackMessage): string => {
-        const toolName = (message as any).toolName || '';
-        switch (toolName.toLowerCase()) {
-            case 'browser':
-            case 'browser_navigate':
-                return t('tool_operations.browsing_web_page');
-            case 'file_write':
-            case 'file':
-                return t('tool_operations.writing_file');
-            case 'file_read':
-                return t('tool_operations.reading_file');
-            case 'search':
-                return t('tool_operations.searching');
-            default:
-                return t('tool_operations.executing', { toolName });
-        }
-    };
+    // Tool operation and status functions removed - BrowserPanel component has been removed
 
-    // Get tool status
-    const getToolStatus = (messageType: string): 'running' | 'completed' | 'error' => {
-        switch (messageType) {
-            case 'tool_use':
-            case 'tool_streaming':
-            case 'tool_running':
-                return 'running';
-            case 'tool_result':
-                return 'completed';
-            case 'error':
-                return 'error';
-            default:
-                return 'running';
-        }
-    };
-
-    // Handle screenshot when tool call completes
-    const handleToolComplete = async (message: ToolAction) => {
-        try {
-            if (window.api && (window.api as any).getMainViewScreenshot) {
-                let result: any = null;
-                // Take screenshot for Browser and File agents to show in detail panel
-                if (DETAIL_PANEL_AGENTS.includes(message.agentName as any)) {
-                    result = await (window.api as any).getMainViewScreenshot();
-                }
-                const toolMessage = {
-                    ...message,
-                    screenshot: result?.imageBase64,
-                    toolSequence: toolHistory.length + 1
-                };
-
-                // Update local toolHistory state
-                setToolHistory(prev => [...prev, toolMessage]);
-
-                // Also save to current task's toolHistory
-                if (taskIdRef.current) {
-                    addToolHistory(taskIdRef.current, toolMessage);
-                }
-
-                console.log('Tool call screenshot saved:', message.type, toolMessage.toolSequence);
-            }
-        } catch (error) {
-            console.error('Screenshot failed:', error);
-        }
-    };
+    // Screenshot handling removed - BrowserPanel component has been removed
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -553,69 +482,13 @@ export default function Main() {
         setCurrentTaskId,
         replaceTaskId,
         updateTask,
-        setCurrentTool,
-        setShowDetail,
-        handleToolComplete,
-        getToolOperation,
-        getToolStatus,
     });
 
     const callback = {
         onMessage,
     };
 
-    // Handle tool call click, show historical screenshot
-    const handleToolClick = async (message: ToolAction) => {
-        console.log('Tool call clicked:', message);
-        // Set current tool information
-        setCurrentTool({
-            toolName: message.toolName,
-            operation: getToolOperation({ toolName: message.toolName } as any),
-            status: getToolStatus(message.status === 'completed' ? 'tool_result' :
-                message.status === 'running' ? 'tool_running' : 'error')
-        });
-
-        // Find corresponding historical tool call
-        const historyTool = toolHistory.find(tool =>
-            (tool as any).toolId === (message as any).toolId && tool.id === message.id
-        );
-        if (historyTool && historyTool.toolSequence && historyTool.screenshot) {
-            setCurrentHistoryIndex(historyTool.toolSequence - 1);
-            // Show detail panel
-            setShowDetail(true);
-            await switchToHistoryIndex(historyTool.toolSequence - 1);
-        }
-    };
-
-    // Switch to specified history index
-    const switchToHistoryIndex = async (newIndex: number) => {
-        // If switching to the last tool, set to -1 to indicate latest state
-        if ((newIndex >= toolHistory.length - 1) && !isHistoryMode) {
-            setCurrentHistoryIndex(-1);
-            try {
-                if (window.api && (window.api as any).hideHistoryView) {
-                    await (window.api as any).hideHistoryView();
-                    console.log('Switched to real-time view');
-                }
-            } catch (error) {
-                console.error('Failed to hide history view:', error);
-            }
-        } else {
-            setCurrentHistoryIndex(newIndex);
-            // Show corresponding historical screenshot
-            const historyTool = toolHistory[newIndex];
-            if (historyTool && historyTool.screenshot) {
-                try {
-                    if (window.api && (window.api as any).showHistoryView) {
-                        await (window.api as any).showHistoryView(historyTool.screenshot);
-                        console.log('Switched to history tool:', newIndex + 1);
-                    }
-                } catch (error) {
-                    console.error('Failed to show history view:', error);
-                }
-            }
-        }
-    };
+    // Tool click handler removed - BrowserPanel component has been removed
 
     // Handle history task selection
     const handleSelectHistoryTask = async (task: Task) => {
@@ -630,12 +503,6 @@ export default function Main() {
 
             // Use Hook to enter history mode
             enterHistoryMode(task);
-            setToolHistory(task.toolHistory || []);
-
-            // Clear current tool state
-            setShowDetail(false);
-            setCurrentTool(null);
-            setCurrentHistoryIndex(toolHistory.length - 1);
 
             // Note: message notification is shown in HistoryPanel.tsx to avoid duplication
         } catch (error) {
@@ -906,15 +773,6 @@ export default function Main() {
     }, [debouncedPersist, debouncedUpdateBounds, layoutMode]);
 
     // Browser view is always visible in the new layout
-    // History view management for tool history playback
-    useEffect(() => {
-        // Hide history view when not in history mode or when detail panel is hidden
-        if ((!showDetail || isHistoryMode) && window.api?.hideHistoryView) {
-            window.api.hideHistoryView().catch(error => {
-                console.error('[HistoryView] Failed to hide history view:', error);
-            });
-        }
-    }, [showDetail, isHistoryMode]);
 
     return (
         <div
@@ -952,57 +810,56 @@ export default function Main() {
                 role="region"
                 aria-label="AI assistant panel"
             >
-                <RoundedContainer className="ai-chat-panel">
+                <RoundedContainer className="ai-chat-panel" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                     {/* AI Sidebar Header - relocated header functionality */}
-                    <AISidebarHeader />
+                    <div style={{ flexShrink: 0 }}>
+                        <AISidebarHeader />
+                    </div>
 
-                    {/* AI Sidebar Content */}
-                    <div className="flex flex-col h-full">
-                        <div className='flex-1 h-full overflow-hidden transition-all duration-300'>
+                    {/* AI Sidebar Content - takes remaining space */}
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+                        <div className='w-full max-w-[636px] mx-auto flex flex-col h-full px-4'>
+                            {/* Task title - fixed at top */}
+                            <div className='flex items-center justify-between py-3' style={{ flexShrink: 0 }}>
+                                <div className='line-clamp-1 text-xl font-semibold flex-1 text-text-01-dark'>
+                                    {currentTaskId && tasks.find(task => task.id === currentTaskId)?.name}
+                                    {isHistoryMode && (
+                                        <span className='ml-2 text-sm text-gray-500'>{t('history_task_readonly')}</span>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Message list - scrollable area */}
                             <div
-                              className='w-full max-w-[636px] mx-auto flex flex-col gap-2 pt-7 pb-4 h-full relative px-4'
-                              role="region"
-                              aria-label="Chat conversation"
+                                ref={scrollContainerRef}
+                                style={{ flex: 1, minHeight: 0, overflowX: 'hidden', overflowY: 'auto' }}
+                                onScroll={handleScroll}
+                                role="log"
+                                aria-live="polite"
+                                aria-label="Chat messages"
                             >
-                                {/* Task title and history button */}
-                                <div className='absolute top-0 left-4 right-4 flex items-center justify-between'>
-                                    <div className='line-clamp-1 text-xl font-semibold flex-1 text-text-01-dark'>
-                                        {currentTaskId && tasks.find(task => task.id === currentTaskId)?.name}
-                                        {isHistoryMode && (
-                                            <span className='ml-2 text-sm text-gray-500'>{t('history_task_readonly')}</span>
-                                        )}
-                                    </div>
-                                </div>
+                                <MessageList messages={messages} />
+                            </div>
 
-                                {/* Message list */}
-                                <div
-                                    ref={scrollContainerRef}
-                                    className='flex-1 h-full overflow-x-hidden overflow-y-auto px-4 pt-5'
-                                    onScroll={handleScroll}
-                                    role="log"
-                                    aria-live="polite"
-                                    aria-label="Chat messages"
-                                >
-                                    <MessageList messages={messages} onToolClick={handleToolClick} />
-                                </div>
-
-                                {/* Question input box - sticky to bottom */}
-                                <div
-                                  className='h-30 gradient-border relative sticky bottom-0 z-10 bg-gradient-to-t from-white via-white to-transparent pt-2'
-                                  role="form"
-                                  aria-label="Message input form"
-                                >
+                            {/* Question input box - fixed at bottom */}
+                            <div
+                              className='gradient-border relative bg-gradient-to-t from-white via-white to-transparent pt-2 pb-4'
+                              style={{ flexShrink: 0 }}
+                              role="form"
+                              aria-label="Message input form"
+                            >
                                     <Input.TextArea
                                         value={query}
                                         onKeyDown={handleKeyDown}
                                         onChange={(e) => setQuery(e.target.value)}
-                                        className="!h-full !bg-tool-call !text-text-01-dark !placeholder-text-12-dark !py-2"
+                                        className="!bg-tool-call !text-text-01-dark !placeholder-text-12-dark !py-2"
                                         placeholder={isHistoryMode ? t('history_readonly_input') : t('input_placeholder')}
                                         disabled={isHistoryMode}
                                         aria-label={isHistoryMode ? t('history_readonly_input') : t('input_placeholder')}
                                         role="textbox"
                                         aria-multiline="true"
                                         tabIndex={0}
+                                        autoSize={{ minRows: 2, maxRows: 4 }}
                                     />
 
                                     {/* Send/Cancel button - only shown in non-history mode */}
@@ -1075,18 +932,7 @@ export default function Main() {
                                         </div>
                                     )}
                                 </div>
-                            </div>
                         </div>
-
-                        {/* Detail Panel - using extracted BrowserPanel component */}
-                        <BrowserPanel
-                          isVisible={showDetail}
-                          currentTool={currentTool}
-                          currentUrl={currentUrl}
-                          toolHistory={toolHistory}
-                          currentHistoryIndex={currentHistoryIndex}
-                          onHistoryIndexChange={switchToHistoryIndex}
-                        />
                     </div>
                 </RoundedContainer>
             </div>

@@ -15,6 +15,9 @@ import { app } from "electron";
 import path from "node:path";
 import fs from "fs/promises";
 import { Log } from "@jarvis-agent/core";
+// ✅ PHASE 2: Import centralized logging
+import { createLogger } from "../utils/logger";
+import { ErrorCategory, ErrorSeverity } from "../utils/error-handler";
 
 /**
  * Checkpoint data structure capturing complete workflow state
@@ -69,6 +72,8 @@ export class TaskCheckpointManager {
   private checkpointDir: string;
   private checkpoints: Map<string, Checkpoint> = new Map();
   private autoSaveInterval: number = 10000; // Auto-save every 10 seconds
+  // ✅ PHASE 2: Add logger instance
+  private logger = createLogger('TaskCheckpointManager');
 
   constructor() {
     this.checkpointDir = path.join(app.getPath('userData'), 'checkpoints');
@@ -81,9 +86,18 @@ export class TaskCheckpointManager {
   private async initializeCheckpointDir() {
     try {
       await fs.mkdir(this.checkpointDir, { recursive: true });
-      Log.info('[TaskCheckpoint] Checkpoint directory initialized:', this.checkpointDir);
+      // ✅ PHASE 2: Use logger for initialization
+      this.logger.info('Checkpoint directory initialized', { path: this.checkpointDir });
     } catch (error) {
-      Log.error('[TaskCheckpoint] Failed to initialize checkpoint directory:', error);
+      // ✅ PHASE 2: Use logger for initialization error
+      this.logger.error(
+        'Failed to initialize checkpoint directory',
+        error as Error,
+        { path: this.checkpointDir },
+        ErrorCategory.FILE_SYSTEM,
+        ErrorSeverity.HIGH,
+        false // non-recoverable - unable to save checkpoints
+      );
     }
   }
 
@@ -134,7 +148,15 @@ export class TaskCheckpointManager {
     this.checkpoints.set(taskId, checkpoint);
     await this.persistCheckpoint(checkpoint);
 
-    Log.info(`[TaskCheckpoint] Created checkpoint ${checkpoint.id} for task ${taskId}`);
+    // ✅ PHASE 2: Use logger for checkpoint creation
+    this.logger.info('Checkpoint created', {
+      taskId,
+      checkpointId: checkpoint.id,
+      iteration: metadata.iteration,
+      totalIterations: metadata.totalIterations,
+      progress: (currentNodeIndex / metadata.totalIterations) * 100
+    });
+
     return checkpoint;
   }
 
@@ -147,7 +169,8 @@ export class TaskCheckpointManager {
   ): Promise<Checkpoint | null> {
     const checkpoint = this.checkpoints.get(taskId);
     if (!checkpoint) {
-      Log.warn(`[TaskCheckpoint] Checkpoint not found for task ${taskId}`);
+      // ✅ PHASE 2: Use logger for checkpoint not found
+      this.logger.warn('Attempted to update non-existent checkpoint', { taskId });
       return null;
     }
 
@@ -160,7 +183,13 @@ export class TaskCheckpointManager {
     this.checkpoints.set(taskId, updated);
     await this.persistCheckpoint(updated);
 
-    Log.debug(`[TaskCheckpoint] Updated checkpoint ${checkpoint.id} for task ${taskId}`);
+    // ✅ PHASE 2: Use logger for checkpoint update
+    this.logger.debug('Checkpoint updated', {
+      taskId,
+      checkpointId: checkpoint.id,
+      newStatus: updated.status
+    });
+
     return updated;
   }
 
@@ -175,9 +204,22 @@ export class TaskCheckpointManager {
         JSON.stringify(checkpoint, null, 2),
         'utf-8'
       );
-      Log.debug(`[TaskCheckpoint] Persisted checkpoint to ${filePath}`);
+      // ✅ PHASE 2: Use logger for persistence
+      this.logger.debug('Checkpoint persisted to disk', {
+        taskId: checkpoint.taskId,
+        path: filePath,
+        status: checkpoint.status
+      });
     } catch (error) {
-      Log.error('[TaskCheckpoint] Failed to persist checkpoint:', error);
+      // ✅ PHASE 2: Use logger for persistence error
+      this.logger.error(
+        'Failed to persist checkpoint',
+        error as Error,
+        { taskId: checkpoint.taskId, checkpointId: checkpoint.id },
+        ErrorCategory.STORAGE,
+        ErrorSeverity.HIGH,
+        true // recoverable - can retry persistence
+      );
       throw error;
     }
   }
@@ -198,14 +240,33 @@ export class TaskCheckpointManager {
       const checkpoint = JSON.parse(data) as Checkpoint;
 
       this.checkpoints.set(taskId, checkpoint);
-      Log.info(`[TaskCheckpoint] Loaded checkpoint from disk for task ${taskId}`);
+
+      // ✅ PHASE 2: Use logger for checkpoint loading
+      this.logger.info('Checkpoint loaded from disk', {
+        taskId,
+        checkpointId: checkpoint.id,
+        status: checkpoint.status,
+        iteration: checkpoint.iteration,
+        progress: (checkpoint.currentNodeIndex / checkpoint.totalIterations) * 100
+      });
+
       return checkpoint;
     } catch (error) {
       if ((error as any).code === 'ENOENT') {
-        Log.debug(`[TaskCheckpoint] No checkpoint found for task ${taskId}`);
+        // ✅ PHASE 2: Log checkpoint not found (expected case)
+        this.logger.debug('No checkpoint found on disk', { taskId });
         return null;
       }
-      Log.error('[TaskCheckpoint] Failed to load checkpoint:', error);
+
+      // ✅ PHASE 2: Use logger for checkpoint load error
+      this.logger.error(
+        'Failed to load checkpoint',
+        error as Error,
+        { taskId },
+        ErrorCategory.STORAGE,
+        ErrorSeverity.MEDIUM,
+        true // recoverable - can start fresh or retry
+      );
       return null;
     }
   }
@@ -218,7 +279,14 @@ export class TaskCheckpointManager {
     if (checkpoint) {
       checkpoint.status = 'paused';
       await this.persistCheckpoint(checkpoint);
-      Log.info(`[TaskCheckpoint] Paused task ${taskId}`);
+      // ✅ PHASE 2: Use logger for pause operation
+      this.logger.info('Task paused with checkpoint', {
+        taskId,
+        checkpointId: checkpoint.id,
+        iteration: checkpoint.iteration,
+        totalIterations: checkpoint.totalIterations,
+        progress: (checkpoint.currentNodeIndex / checkpoint.totalIterations) * 100
+      });
     }
   }
 
@@ -240,7 +308,21 @@ export class TaskCheckpointManager {
       };
       checkpoint.failurePoint = failurePoint;
       await this.persistCheckpoint(checkpoint);
-      Log.error(`[TaskCheckpoint] Failed task ${taskId} at ${failurePoint}: ${error.message}`);
+      // ✅ PHASE 2: Use logger for failure tracking
+      this.logger.error(
+        'Task failed at checkpoint',
+        new Error(error.message),
+        {
+          taskId,
+          checkpointId: checkpoint.id,
+          failurePoint,
+          iteration: checkpoint.iteration,
+          error: error.code
+        },
+        ErrorCategory.AGENT,
+        ErrorSeverity.MEDIUM,
+        true // recoverable - can retry from checkpoint
+      );
     }
   }
 
@@ -258,7 +340,13 @@ export class TaskCheckpointManager {
         timestamp: Date.now(),
       });
       await this.persistCheckpoint(checkpoint);
-      Log.info(`[TaskCheckpoint] Completed task ${taskId}`);
+      // ✅ PHASE 2: Use logger for completion
+      this.logger.info('Task completed from checkpoint', {
+        taskId,
+        checkpointId: checkpoint.id,
+        totalIterations: checkpoint.totalIterations,
+        totalToolResults: checkpoint.toolResults.length
+      });
     }
   }
 
@@ -270,9 +358,18 @@ export class TaskCheckpointManager {
       const filePath = path.join(this.checkpointDir, `${taskId}.json`);
       await fs.unlink(filePath);
       this.checkpoints.delete(taskId);
-      Log.info(`[TaskCheckpoint] Deleted checkpoint for task ${taskId}`);
+      // ✅ PHASE 2: Use logger for deletion
+      this.logger.info('Checkpoint deleted', { taskId, path: filePath });
     } catch (error) {
-      Log.warn(`[TaskCheckpoint] Failed to delete checkpoint for task ${taskId}:`, error);
+      // ✅ PHASE 2: Use logger for deletion error
+      this.logger.warn(
+        'Failed to delete checkpoint file',
+        error as Error,
+        { taskId },
+        ErrorCategory.STORAGE,
+        ErrorSeverity.LOW,
+        true // recoverable - file cleanup not critical
+      );
     }
   }
 
@@ -317,9 +414,20 @@ export class TaskCheckpointManager {
         }
       }
 
+      // ✅ PHASE 2: Use logger for checkpoint listing
+      this.logger.debug('Listed all checkpoints', { count: checkpoints.length });
+
       return checkpoints.sort((a, b) => b.timestamp - a.timestamp);
     } catch (error) {
-      Log.error('[TaskCheckpoint] Failed to list checkpoints:', error);
+      // ✅ PHASE 2: Use logger for listing error
+      this.logger.error(
+        'Failed to list checkpoints',
+        error as Error,
+        { path: this.checkpointDir },
+        ErrorCategory.STORAGE,
+        ErrorSeverity.MEDIUM,
+        true // recoverable - can retry
+      );
       return [];
     }
   }
@@ -340,10 +448,26 @@ export class TaskCheckpointManager {
         }
       }
 
-      Log.info(`[TaskCheckpoint] Cleaned up ${deleted} old checkpoints`);
+      if (deleted > 0) {
+        // ✅ PHASE 2: Use logger for cleanup operation
+        this.logger.info('Cleaned up old checkpoints', {
+          count: deleted,
+          totalBefore: checkpoints.length,
+          maxAge
+        });
+      }
+
       return deleted;
     } catch (error) {
-      Log.error('[TaskCheckpoint] Failed to cleanup old checkpoints:', error);
+      // ✅ PHASE 2: Use logger for cleanup error
+      this.logger.error(
+        'Failed to cleanup old checkpoints',
+        error as Error,
+        { maxAge },
+        ErrorCategory.STORAGE,
+        ErrorSeverity.MEDIUM,
+        true // recoverable - will retry next time
+      );
       return 0;
     }
   }
@@ -389,10 +513,24 @@ export class TaskCheckpointManager {
         // Mark as paused instead of deleting, for potential recovery
         checkpoint.status = 'paused';
         await this.persistCheckpoint(checkpoint);
+
+        // ✅ PHASE 2: Use logger for force cleanup
+        this.logger.info('Force cleanup: task paused for recovery', {
+          taskId,
+          checkpointId: checkpoint.id,
+          iteration: checkpoint.iteration
+        });
       }
-      Log.info(`[TaskCheckpoint] Forced cleanup for task ${taskId}`);
     } catch (error) {
-      Log.error('[TaskCheckpoint] Failed to force cleanup:', error);
+      // ✅ PHASE 2: Use logger for force cleanup error
+      this.logger.error(
+        'Failed to perform force cleanup',
+        error as Error,
+        { taskId },
+        ErrorCategory.AGENT,
+        ErrorSeverity.MEDIUM,
+        true // recoverable - cleanup next time
+      );
     }
   }
 }

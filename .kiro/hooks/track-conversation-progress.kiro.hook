@@ -1,0 +1,23 @@
+{
+  "enabled": true,
+  "name": "Track Conversation Progress",
+  "description": "Monitors conversation history and automatically updates project_status.md with implementation progress, next steps, and detailed debug logs whenever the conversation evolves",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      ".claude/**/*",
+      "src/**/*",
+      "electron/**/*",
+      "docs/**/*",
+      "*.md",
+      "*.json",
+      "*.ts",
+      "*.tsx"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Review the entire conversation history and all recent file changes. Update the project_status.md file with:\n\n1. **What Has Been Implemented**: List all completed features, fixes, and changes discussed in this conversation with timestamps and file references\n2. **What's Next**: Prioritized list of upcoming tasks, features, or issues to address based on the conversation\n3. **Detailed Debug Log**: Comprehensive log including:\n   - Conversation milestones and decisions made\n   - Code changes and their rationale\n   - Issues encountered and resolutions\n   - Agent invocations and their outcomes\n   - File modifications with context\n   - Performance considerations\n   - Security reviews performed\n   - Testing status\n   - Technical debt identified\n\nFormat the update clearly with sections, timestamps, and actionable items. Maintain historical context while highlighting recent progress."
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Scratchpad Maintenance Hook",
+  "description": "Monitors scratchpad.md for changes and prompts the AI to review, update lessons learned, and maintain task progress tracking",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "scratchpad.md"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "The scratchpad.md file has been updated. Please review the changes and:\n\n1. **Review Current Task Section**: Check if the task description and progress markers are up to date\n2. **Update Lessons Section**: If any new reusable information, fixes, or corrections were added, ensure they are properly documented in the Lessons section\n3. **Maintain Organization**: Ensure the scratchpad is well-organized with clear task markers ([X] for completed, [ ] for pending)\n4. **Clear Old Tasks**: If a new task has started, check if old task information should be archived or cleared\n5. **Reflect on Progress**: When milestones are reached, help maintain the big picture and plan next steps\n\nRemember to:\n- Keep lessons specific and actionable (e.g., library versions, model names, common mistakes)\n- Use todo markers consistently\n- Update progress as subtasks complete\n- Help maintain context across sessions"
+  }
+}

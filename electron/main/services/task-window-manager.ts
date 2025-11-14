@@ -1,8 +1,12 @@
 import { BrowserWindow, dialog, WebContentsView } from "electron";
 import { EkoService } from "./eko-service";
 import { windowContextManager, type WindowContext } from "./window-context-manager";
+import { ConfigManager } from "../utils/config-manager";
 import { createWindow } from '../ui/window';
 import { createView } from "../ui/view";
+// ✅ PHASE 2: Import centralized logging
+import { createLogger } from "../utils/logger";
+import { ErrorCategory, ErrorSeverity } from "../utils/error-handler";
 
 
 /**
@@ -25,6 +29,8 @@ interface TaskWindowContext {
 export class TaskWindowManager {
   private taskWindows: Map<string, TaskWindowContext> = new Map(); // Manage by taskId
   private maxConcurrentTasks: number = 3; // Maximum concurrent tasks
+  // ✅ PHASE 2: Add logger instance
+  private logger = createLogger('TaskWindowManager');
 
   /**
    * Create or reuse execution window for task
@@ -37,15 +43,27 @@ export class TaskWindowManager {
     const existingContext = this.taskWindows.get(taskId);
 
     if (existingContext) {
-      console.log(`[TaskWindowManager] Reusing existing window: taskId=${taskId}`);
+      // ✅ PHASE 2: Use logger for window reuse
+      this.logger.info('Reusing existing task window', { taskId, executionId });
 
       // Terminate currently executing task
       if (existingContext.executionId) {
-        console.log(`[TaskWindowManager] Terminating old task: executionId=${existingContext.executionId}`);
+        this.logger.debug('Terminating previous task execution', {
+          taskId,
+          previousExecutionId: existingContext.executionId
+        });
         try {
-          await existingContext.ekoService.cancleTask(existingContext.executionId);
+          await existingContext.ekoService.cancelTask(existingContext.executionId);
         } catch (error) {
-          console.error('[TaskWindowManager] Failed to terminate old task:', error);
+          // ✅ PHASE 2: Use logger for window error
+          this.logger.error(
+            'Failed to terminate previous task during window reuse',
+            error as Error,
+            { taskId, previousExecutionId: existingContext.executionId },
+            ErrorCategory.WINDOW,
+            ErrorSeverity.MEDIUM,
+            true // recoverable - task can still execute
+          );
         }
       }
 
@@ -53,7 +71,8 @@ export class TaskWindowManager {
       existingContext.executionId = executionId;
 
       // Reload page with new executionId (keep original loadURL format)
-      existingContext.window.loadURL(`http://localhost:5173/main?taskId=${taskId}&executionId=${executionId}`);
+      const taskWindowUrl = ConfigManager.getInstance().getTaskWindowUrl();
+      existingContext.window.loadURL(`${taskWindowUrl}?taskId=${taskId}&executionId=${executionId}`);
 
       // Focus window
       existingContext.window.show();
@@ -64,13 +83,29 @@ export class TaskWindowManager {
 
     // Check concurrency limit (only for new windows)
     if (this.taskWindows.size >= this.maxConcurrentTasks) {
-      throw new Error(`Maximum concurrent tasks reached (${this.maxConcurrentTasks})`);
+      // ✅ PHASE 2: Log concurrency limit violation
+      const error = `Maximum concurrent tasks reached (${this.maxConcurrentTasks})`;
+      this.logger.error(
+        error,
+        new Error(error),
+        { currentWindows: this.taskWindows.size, maxConcurrentTasks: this.maxConcurrentTasks },
+        ErrorCategory.WINDOW,
+        ErrorSeverity.MEDIUM,
+        true // recoverable - user can wait or close another task
+      );
+      throw new Error(error);
     }
 
-    console.log(`[TaskWindowManager] Creating new window: taskId=${taskId}, executionId=${executionId}`);
+    // ✅ PHASE 2: Log new window creation
+    this.logger.info('Creating new task window', {
+      taskId,
+      executionId,
+      totalWindows: this.taskWindows.size + 1
+    });
 
     // Create new window (keep original loadURL format)
-    const taskWindow = createWindow(`http://localhost:5173/main?taskId=${taskId}&executionId=${executionId}`)
+    const taskWindowUrl = ConfigManager.getInstance().getTaskWindowUrl();
+    const taskWindow = createWindow(`${taskWindowUrl}?taskId=${taskId}&executionId=${executionId}`)
 
     // Create detailView
     const detailView = createView(`https://www.google.com`, "view", '2');
@@ -96,12 +131,14 @@ export class TaskWindowManager {
 
     // Listen for detail view URL changes
     detailView.webContents.on('did-navigate', (_event, url) => {
-      console.log('detail view did-navigate:', url);
+      // ✅ PHASE 2: Use logger for view navigation
+      this.logger.debug('Detail view navigation', { taskId, url, event: 'did-navigate' });
       taskWindow?.webContents.send('url-changed', url);
     });
 
     detailView.webContents.on('did-navigate-in-page', (_event, url) => {
-      console.log('detail view did-navigate-in-page:', url);
+      // ✅ PHASE 2: Use logger for in-page navigation
+      this.logger.debug('Detail view in-page navigation', { taskId, url, event: 'did-navigate-in-page' });
       taskWindow?.webContents.send('url-changed', url);
     });
 
@@ -145,6 +182,9 @@ export class TaskWindowManager {
       const hasRunningTask = ekoService.hasRunningTask();
 
       if (hasRunningTask) {
+        // ✅ PHASE 2: Log user confirmation prompt
+        this.logger.warn('Task still running, prompting user for confirmation', { taskId });
+
         // Prevent default close behavior
         event.preventDefault();
 
@@ -160,8 +200,8 @@ export class TaskWindowManager {
         });
 
         if (response === 1) {
-          // Stop task and close
-          console.log(`[TaskWindowManager] User chose to stop task: taskId=${taskId}`);
+          // ✅ PHASE 2: Log user decision to stop and close
+          this.logger.info('User chose to stop task and close window', { taskId });
 
           // Get all task IDs
           const allTaskIds = ekoService['eko']?.getAllTaskId() || [];
@@ -191,7 +231,8 @@ export class TaskWindowManager {
 
     // Clean up on window close
     taskWindow.on('closed', () => {
-      console.log(`[TaskWindowManager] Window closed event triggered: taskId=${taskId}`);
+      // ✅ PHASE 2: Log window closed event
+      this.logger.info('Window closed, performing cleanup', { taskId, remainingWindows: this.taskWindows.size - 1 });
 
       // Remove from taskWindows
       this.taskWindows.delete(taskId);
@@ -202,13 +243,26 @@ export class TaskWindowManager {
           windowContextManager.unregisterWindow(taskWindow.webContents.id);
         }
       } catch (error) {
-        console.error('[TaskWindowManager] Failed to unregister window context:', error);
+        // ✅ PHASE 2: Log window unregistration error
+        this.logger.error(
+          'Failed to unregister window context',
+          error as Error,
+          { taskId },
+          ErrorCategory.WINDOW,
+          ErrorSeverity.MEDIUM,
+          false // non-recoverable window error
+        );
       }
 
-      console.log(`[TaskWindowManager] Window cleanup completed: taskId=${taskId}, remaining windows: ${this.taskWindows.size}`);
+      this.logger.debug('Window cleanup completed', { taskId, remainingWindows: this.taskWindows.size });
     });
 
-    console.log(`[TaskWindowManager] Window created successfully: taskId=${taskId}, current windows: ${this.taskWindows.size}`);
+    // ✅ PHASE 2: Log successful window creation
+    this.logger.info('Task window created successfully', {
+      taskId,
+      executionId,
+      totalWindows: this.taskWindows.size
+    });
 
     return context;
   }
@@ -220,7 +274,8 @@ export class TaskWindowManager {
   async closeTaskWindow(taskId: string): Promise<void> {
     const context = this.taskWindows.get(taskId);
     if (!context) {
-      console.warn(`[TaskWindowManager] Task window not found: taskId=${taskId}`);
+      // ✅ PHASE 2: Log window not found
+      this.logger.warn('Attempted to close non-existent task window', { taskId });
       return;
     }
 
@@ -228,7 +283,8 @@ export class TaskWindowManager {
       context.window.close();
     }
 
-    console.log(`[TaskWindowManager] Task window closed: taskId=${taskId}`);
+    // ✅ PHASE 2: Log window close operation
+    this.logger.debug('Task window close initiated', { taskId });
   }
 
   /**
@@ -259,10 +315,21 @@ export class TaskWindowManager {
    */
   setMaxConcurrentTasks(max: number): void {
     if (max < 1 || max > 5) {
-      throw new Error('Maximum concurrent tasks must be between 1-5');
+      // ✅ PHASE 2: Log concurrency configuration error
+      const error = 'Maximum concurrent tasks must be between 1-5';
+      this.logger.error(
+        error,
+        new Error(error),
+        { requestedMax: max },
+        ErrorCategory.CONFIG,
+        ErrorSeverity.MEDIUM,
+        false // non-recoverable - invalid config
+      );
+      throw new Error(error);
     }
     this.maxConcurrentTasks = max;
-    console.log(`[TaskWindowManager] Max concurrent tasks set to ${max}`);
+    // ✅ PHASE 2: Log concurrency configuration change
+    this.logger.info('Task concurrency limit updated', { maxConcurrentTasks: max });
   }
 
   /**
@@ -280,7 +347,8 @@ export class TaskWindowManager {
    * Close all task windows
    */
   closeAllTaskWindows(): void {
-    console.log(`[TaskWindowManager] Closing all task windows (${this.taskWindows.size})`);
+    // ✅ PHASE 2: Log bulk window closure
+    this.logger.info('Closing all task windows', { windowCount: this.taskWindows.size });
 
     Array.from(this.taskWindows.values()).forEach((context) => {
       if (!context.window.isDestroyed()) {
@@ -289,6 +357,9 @@ export class TaskWindowManager {
     });
 
     this.taskWindows.clear();
+
+    // ✅ PHASE 2: Log cleanup completion
+    this.logger.debug('All task windows closed and cleared');
   }
 
   /**
