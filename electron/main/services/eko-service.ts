@@ -6,6 +6,9 @@ import path from "node:path";
 import { ConfigManager } from "../utils/config-manager";
 import { taskCheckpointManager, type Checkpoint } from "./task-checkpoint";
 import { agentContextManager } from "./agent-context-manager";
+// ✅ PHASE 2: Import centralized logging and error handling
+import { createLogger } from "../utils/logger";
+import { ErrorCategory, ErrorSeverity } from "../utils/error-handler";
 // Phase 1, 2 & 3: Import browser tools
 import {
   browserGetMarkdownTool,
@@ -67,6 +70,10 @@ export class EkoService {
   private mcpClient!: SimpleSseMcpClient;
   private agents!: any[];
   private activeCheckpoints: Map<string, Checkpoint> = new Map();
+  // ✅ Task tracking map for getTaskStatus() (P0.8)
+  private taskStatus: Map<string, { status: 'running' | 'completed' | 'failed' | 'cancelled'; progress: number; startTime: Date; endTime?: Date; error?: string }> = new Map();
+  // ✅ PHASE 2: Logger instance for standardized logging
+  private logger = createLogger('EkoService');
 
   constructor(mainWindow: BrowserWindow, detailView: WebContentsView) {
     this.mainWindow = mainWindow;
@@ -80,11 +87,12 @@ export class EkoService {
   private createCallback() {
     return {
       onMessage: (message: StreamCallbackMessage): Promise<void> => {
-        Log.info('EkoService stream callback:', message);
+        // ✅ PHASE 2: Use standardized logger instead of Log.info
+        this.logger.debug('Stream callback received', { type: message.type, toolName: message.toolName });
 
         // Window destroyed, return directly to avoid errors
         if (!this.mainWindow || this.mainWindow.isDestroyed()) {
-          Log.warn('Main window destroyed, skipping message processing');
+          this.logger.warn('Main window is destroyed, cannot process stream message');
           return Promise.resolve();
         }
 
@@ -99,21 +107,42 @@ export class EkoService {
           try {
             args = JSON.parse(message.paramsText);
           } catch (error) {
-            Log.error('File stream incomplete! Need to complete')
+            // ✅ PHASE 2: Proper error logging with context
+            this.logger.error(
+              'Failed to parse file stream params',
+              error,
+              { paramsText: message.paramsText?.substring(0, 50) },
+              ErrorCategory.FILE_SYSTEM,
+              ErrorSeverity.MEDIUM,
+              true
+            );
           }
 
-          try {
-            args = JSON.parse(`${message.paramsText}\"}`);
-          } catch (error) {
-            Log.error('File stream completion failed!');
+          // Try fallback parsing if first attempt failed
+          if (!args) {
+            try {
+              args = JSON.parse(`${message.paramsText}\"}`);
+            } catch (error) {
+              this.logger.error(
+                'Failed to parse file stream with fallback',
+                error,
+                { paramsText: message.paramsText?.substring(0, 50) },
+                ErrorCategory.FILE_SYSTEM,
+                ErrorSeverity.MEDIUM,
+                true
+              );
+            }
           }
 
           if (args && args.content) {
-            Log.info('File write detected, loading file-view in mainView', args.content);
+            this.logger.info('File content updated, loading file-view', {
+              contentLength: args.content?.length || 0
+            });
             const url = this.detailView.webContents.getURL();
-            Log.info('current URL', url, !url.includes('file-view'))
             if (!url.includes('file-view')) {
-              this.detailView.webContents.loadURL(`http://localhost:5173/file-view`);
+              const fileViewUrl = ConfigManager.getInstance().getFileViewUrl();
+              this.logger.debug('Loading file-view URL', { url: fileViewUrl });
+              this.detailView.webContents.loadURL(fileViewUrl);
               this.detailView.webContents.once('did-finish-load', () => {
                 this.detailView.webContents.send('file-updated', 'code', args.content);
                 resolve();
@@ -128,10 +157,14 @@ export class EkoService {
         } else {
           resolve();
         }
-        })  
+        })
       },
       onHuman: (message: any) => {
-        console.log('EkoService human callback:', message);
+        // ✅ PHASE 2: Use logger for human interaction callbacks
+        this.logger.info('Human interaction required', {
+          type: message.type,
+          prompt: message.prompt?.substring(0, 100)
+        });
       }
     };
   }
@@ -150,10 +183,11 @@ export class EkoService {
       ? path.join(app.getPath('userData'), 'static')  // Packaged path
       : path.join(process.cwd(), 'public', 'static');    // Development environment path
 
-    Log.info(`FileAgent working path: ${appPath}`);
+    // ✅ PHASE 2: Use standardized logger
+    this.logger.info('Initializing FileAgent', { workingPath: appPath });
 
     // MCP client configuration - configure based on your MCP server address
-    const sseUrl = "http://localhost:5173/api/mcp/sse";
+    const sseUrl = ConfigManager.getInstance().getMcpSseUrl();
     this.mcpClient = new SimpleSseMcpClient(sseUrl);
 
     // Create agents with custom prompts
@@ -234,8 +268,15 @@ export class EkoService {
       }
 
       this.agents.push(browserAgent);
-      Log.info('BrowserAgent enabled with custom prompt:', agentConfig.browserAgent.customPrompt ? 'Yes' : 'No');
-      Log.info('Phase 1 browser tools registered: 6 advanced tools added');
+      // ✅ PHASE 2: Structured logging with configuration details
+      this.logger.info('BrowserAgent initialized', {
+        customPrompt: agentConfig.browserAgent.customPrompt ? 'Yes' : 'No',
+        phase1Tools: 6,
+        phase2Tools: 3,
+        phase3Tools: 2,
+        phase4Tools: ENABLE_ADVANCED_TOOLS ? 22 : 0,
+        phase5Tools: ENABLE_GESTURE_TOOLS ? 5 : 0
+      });
       Log.info('Phase 2 browser tools registered: 3 tab management tools added');
       Log.info('Phase 3 browser tools registered: 2 core interaction tools added');
       if (ENABLE_ADVANCED_TOOLS) {
@@ -259,13 +300,22 @@ export class EkoService {
           agentConfig.fileAgent.customPrompt
         )
       );
-      Log.info('FileAgent enabled with custom prompt:', agentConfig.fileAgent.customPrompt ? 'Yes' : 'No');
+      // ✅ PHASE 2: Use logger for FileAgent initialization
+      this.logger.info('FileAgent initialized', {
+        customPrompt: agentConfig.fileAgent.customPrompt ? 'Yes' : 'No',
+        workingPath: appPath
+      });
     }
 
     // Create callback and initialize Eko instance
     const callback = this.createCallback();
     this.eko = new Eko({ llms, agents: this.agents, callback });
-    Log.info('EkoService initialized with LLMs:', llms.default?.model);
+    // ✅ PHASE 2: Structured initialization logging
+    this.logger.info('EkoService fully initialized', {
+      model: llms.default?.model,
+      agents: this.agents.length,
+      llmProvider: llms.default?.provider
+    });
   }
 
   /**
@@ -273,7 +323,8 @@ export class EkoService {
    * Called when user changes model configuration in UI
    */
   public reloadConfig(): void {
-    Log.info('Reloading EkoService configuration...');
+    // ✅ PHASE 2: Use logger for configuration reload
+    this.logger.info('Reloading EkoService configuration');
 
     // Abort all running tasks before reloading
     if (this.eko) {
@@ -282,7 +333,15 @@ export class EkoService {
         try {
           this.eko!.abortTask(taskId, 'config-reload');
         } catch (error) {
-          Log.error(`Failed to abort task ${taskId}:`, error);
+          // ✅ PHASE 2: Proper error logging for task abort
+          this.logger.error(
+            'Failed to abort task during config reload',
+            error,
+            { taskId },
+            ErrorCategory.AGENT,
+            ErrorSeverity.MEDIUM,
+            true
+          );
         }
       });
     }
@@ -291,13 +350,17 @@ export class EkoService {
     const configManager = ConfigManager.getInstance();
     const llms: LLMs = configManager.getLLMsConfig();
 
-    Log.info('New LLMs config:', llms.default?.model);
+    // ✅ PHASE 2: Structured configuration logging
+    this.logger.info('New LLM configuration loaded', {
+      model: llms.default?.model,
+      provider: llms.default?.provider
+    });
 
     // Create new Eko instance with updated config and fresh callback
     const callback = this.createCallback();
     this.eko = new Eko({ llms, agents: this.agents, callback });
 
-    Log.info('EkoService configuration reloaded successfully');
+    this.logger.info('EkoService configuration reloaded successfully');
 
     // Notify frontend about config reload
     if (!this.mainWindow || this.mainWindow.isDestroyed()) {
@@ -316,17 +379,44 @@ export class EkoService {
   async run(message: string): Promise<EkoResult | null> {
     if (!this.eko) {
       const errorMsg = 'Eko service not initialized';
-      Log.error(errorMsg);
+      // ✅ PHASE 2: Use logger for initialization errors
+      this.logger.error(
+        errorMsg,
+        new Error(errorMsg),
+        undefined,
+        ErrorCategory.AGENT,
+        ErrorSeverity.CRITICAL,
+        false
+      );
       this.sendErrorToFrontend(errorMsg);
       return null;
     }
 
-    console.log('EkoService running task:', message);
+    // ✅ PHASE 2: Use logger instead of console.log
+    this.logger.info('Starting task execution', { messageLength: message.length });
     let result = null;
     try {
       result = await this.eko.run(message);
+      // ✅ Track task status (P0.8)
+      if (result && result.taskId) {
+        this.taskStatus.set(result.taskId, {
+          status: result.error ? 'failed' : 'completed',
+          progress: 100,
+          startTime: new Date(),
+          endTime: new Date(),
+          error: result.error?.toString()
+        });
+      }
     } catch (error: any) {
-      Log.error('EkoService run error:', error);
+      // ✅ PHASE 2: Proper error logging with recovery strategy
+      this.logger.error(
+        'Task execution failed',
+        error,
+        { messageLength: message.length },
+        ErrorCategory.AGENT,
+        ErrorSeverity.MEDIUM,
+        true
+      );
 
       // Extract error message
       const errorMessage = error?.message || error?.toString() || 'Unknown error occurred';
@@ -340,7 +430,8 @@ export class EkoService {
    */
   private sendErrorToFrontend(errorMessage: string, error?: any, taskId?: string): void {
     if (!this.mainWindow || this.mainWindow.isDestroyed()) {
-      Log.warn('Main window destroyed, cannot send error message');
+      // ✅ PHASE 2: Use logger for window state issues
+      this.logger.warn('Main window is destroyed, cannot send error message', { hasError: !!error });
       return;
     }
 
@@ -358,17 +449,34 @@ export class EkoService {
   async modify(taskId: string, message: string): Promise<EkoResult | null> {
     if (!this.eko) {
       const errorMsg = 'Eko service not initialized';
-      Log.error(errorMsg);
+      // ✅ PHASE 2: Use logger for initialization errors
+      this.logger.error(
+        errorMsg,
+        new Error(errorMsg),
+        { taskId },
+        ErrorCategory.AGENT,
+        ErrorSeverity.CRITICAL,
+        false
+      );
       this.sendErrorToFrontend(errorMsg, undefined, taskId);
       return null;
     }
 
+    this.logger.info('Modifying task', { taskId, messageLength: message.length });
     let result = null;
     try {
       await this.eko.modify(taskId, message);
       result = await this.eko.execute(taskId);
     } catch (error: any) {
-      Log.error('EkoService modify error:', error);
+      // ✅ PHASE 2: Detailed error logging for task modification
+      this.logger.error(
+        'Failed to modify task',
+        error,
+        { taskId },
+        ErrorCategory.AGENT,
+        ErrorSeverity.MEDIUM,
+        true
+      );
       const errorMessage = error?.message || error?.toString() || 'Failed to modify task';
       this.sendErrorToFrontend(errorMessage, error, taskId);
     }
@@ -405,21 +513,37 @@ export class EkoService {
       throw new Error('Eko service not initialized');
     }
 
-    // If Eko has a method to get task status, it can be called here
-    // return await this.eko.getTaskStatus(taskId);
+    // ✅ Return tracked task status (P0.8)
+    const trackedTask = this.taskStatus.get(taskId);
+    if (trackedTask) {
+      return {
+        taskId,
+        status: trackedTask.status,
+        progress: trackedTask.progress,
+        startTime: trackedTask.startTime,
+        endTime: trackedTask.endTime,
+        error: trackedTask.error
+      };
+    }
+
+    // Fallback for tasks not in our map (legacy or external tasks)
     console.log('EkoService getting task status:', taskId);
-    return { taskId, status: 'unknown' };
+    return {
+      taskId,
+      status: 'unknown',
+      progress: 0
+    };
   }
 
   /**
    * Cancel task
    */
-  async cancleTask(taskId: string): Promise<any> {
+  async cancelTask(taskId: string): Promise<any> {
     if (!this.eko) {
       throw new Error('Eko service not initialized');
     }
 
-    const res = await this.eko.abortTask(taskId, 'cancle');
+    const res = await this.eko.abortTask(taskId, 'cancel');
     return res;
   }
 
