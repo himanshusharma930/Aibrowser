@@ -53,7 +53,14 @@ export default defineConfig({
         format: 'esm',
       },
     },
-    minify: false,
+    minify: process.env.NODE_ENV === 'production',
     emptyOutDir: false,
+    // Memory optimizations
+    chunkSizeWarningLimit: 1000,
+    sourcemap: false,
+  },
+  // Reduce memory during dev
+  server: {
+    hmr: false,
   },
 });

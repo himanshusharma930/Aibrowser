@@ -57,8 +57,6 @@ export const IPC_CHANNELS = {
   VOICE: {
     SEND_VOICE_TEXT_TO_CHAT: 'send-voice-text-to-chat',
     VOICE_TEXT_RECEIVED: 'voice-text-received',
-    SEND_TTS_SUBTITLE: 'send-tts-subtitle',
-    TTS_SUBTITLE_RECEIVED: 'tts-subtitle-received',
   },
   UTIL: {
     TASK_EXECUTION_COMPLETE: 'task-execution-complete',

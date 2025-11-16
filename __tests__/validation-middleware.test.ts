@@ -208,8 +208,8 @@ describe('Validation Middleware - Rate Limiting', () => {
 
     const mockCache = (createRateLimitCache as jest.MockedFunction<typeof createRateLimitCache>).mock.results[0].value;
 
-    const event1 = { sender: { id: 111 } };
-    const event2 = { sender: { id: 222 } };
+    const event1 = { sender: { id: 111 } } as any;
+    const event2 = { sender: { id: 222 } } as any;
 
     // Both senders should be allowed their own limits
     mockCache.get.mockReturnValue(undefined);

@@ -1,11 +1,19 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/router'
-import { PanelGroup, Panel, PanelResizeHandle } from 'react-resizable-panels'
-import AISidebarHeader from '@/components/AISidebarHeader'
-import { BrowserArea } from '@/components/BrowserArea'
-import RoundedContainer from '@/components/RoundedContainer'
-import { Input, Button, App, Tooltip, Space } from 'antd'
-import { PauseOutlined, PlayCircleOutlined } from '@ant-design/icons'
+import dynamic from 'next/dynamic'
+import { Input, Button, App } from 'antd'
+
+// Lazy load heavy components
+const PanelGroup = dynamic(() => import('react-resizable-panels').then(m => m.PanelGroup), { ssr: false })
+const Panel = dynamic(() => import('react-resizable-panels').then(m => m.Panel), { ssr: false })
+const PanelResizeHandle = dynamic(() => import('react-resizable-panels').then(m => m.PanelResizeHandle), { ssr: false })
+const AISidebarHeader = dynamic(() => import('@/components/AISidebarHeader'), { ssr: false })
+const BrowserArea = dynamic(() => import('@/components/BrowserArea').then(m => ({ default: m.BrowserArea })), { ssr: false })
+const RoundedContainer = dynamic(() => import('@/components/RoundedContainer'), { ssr: false })
+const Tooltip = dynamic(() => import('antd').then(m => m.Tooltip), { ssr: false })
+const Space = dynamic(() => import('antd').then(m => m.Space), { ssr: false })
+const PauseOutlined = dynamic(() => import('@ant-design/icons').then(m => m.PauseOutlined), { ssr: false })
+const PlayCircleOutlined = dynamic(() => import('@ant-design/icons').then(m => m.PlayCircleOutlined), { ssr: false })
 import { EkoResult, StreamCallbackMessage } from '@jarvis-agent/core/dist/types';
 import { MessageList } from '@/components/chat/MessageComponents';
 import { uuidv4 } from '@/common/utils';

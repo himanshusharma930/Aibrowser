@@ -227,20 +227,6 @@ export function setupMCPHandlers() {
   });
 
   /**
-   * Refresh tools from specific server
-   */
-  ipcMain.handle('mcp:refresh-server-tools', async (_, serverId: string) => {
-    try {
-      const toolCount = await mcpClientManager.refreshServerTools(serverId);
-      Log.info(`[IPC] Refreshed tools from MCP server: ${serverId}, found ${toolCount} tools`);
-      return { success: true, toolCount };
-    } catch (error: any) {
-      Log.error('[IPC] Error refreshing server tools:', error);
-      return { success: false, error: error.message };
-    }
-  });
-
-  /**
    * Health check - verify all connected servers
    */
   ipcMain.handle('mcp:health-check', async () => {

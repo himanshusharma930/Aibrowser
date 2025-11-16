@@ -99,11 +99,6 @@ const api = {
     // Voice text transmission related APIs
     sendVoiceTextToChat: (text: string) => ipcRenderer.invoke('send-voice-text-to-chat', text),
     onVoiceTextReceived: (callback: (text: string) => void) => ipcRenderer.on('voice-text-received', (_, text) => callback(text)),
-
-      // TTS subtitle related APIs
-  sendTTSSubtitle: (text: string, isStart: boolean) => ipcRenderer.invoke('send-tts-subtitle', text, isStart),
-  onTTSSubtitleReceived: (callback: (text: string, isStart: boolean) => void) => 
-    ipcRenderer.on('tts-subtitle-received', (_, text, isStart) => callback(text, isStart)),
   getMainViewWindowNumber: () => ipcRenderer.invoke('get-main-view-window-number'),
   captureWindow: (winNo: number, scale = 1) => ipcRenderer.invoke('native:captureWindow', winNo, scale),
   captureWindowSync: (winNo: number, scale = 1) => ipcRenderer.sendSync('native:captureWindow:sync', winNo, scale),

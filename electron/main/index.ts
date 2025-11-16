@@ -373,6 +373,11 @@ async function initializeMainWindow(): Promise<BrowserWindow> {
 }
 
 (async () => {
+  // Memory optimizations
+  app.commandLine.appendSwitch('js-flags', '--max-old-space-size=2048');
+  app.commandLine.appendSwitch('disable-renderer-backgrounding');
+  app.commandLine.appendSwitch('disable-background-timer-throttling');
+  
   await app.whenReady();
   console.log("App is ready");
 

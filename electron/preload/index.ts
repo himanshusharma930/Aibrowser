@@ -177,12 +177,6 @@ const api = {
       ipcRenderer.on(IPC_CHANNELS.VOICE.VOICE_TEXT_RECEIVED, listener);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.VOICE.VOICE_TEXT_RECEIVED, listener);
     },
-    sendTTSSubtitle: (text: string, isStart: boolean) => ipcRenderer.invoke(IPC_CHANNELS.VOICE.SEND_TTS_SUBTITLE, text, isStart),
-    onTTSSubtitleReceived: (callback: (text: string, isStart: boolean) => void) => {
-      const listener = (_: any, text: string, isStart: boolean) => callback(text, isStart);
-      ipcRenderer.on(IPC_CHANNELS.VOICE.TTS_SUBTITLE_RECEIVED, listener);
-      return () => ipcRenderer.removeListener(IPC_CHANNELS.VOICE.TTS_SUBTITLE_RECEIVED, listener);
-    },
   },
 
   util: {
@@ -222,8 +216,6 @@ const deprecatedApiMappings = {
   hideViewWindow: { namespace: 'view', method: 'hideViewWindow' },
   sendVoiceTextToChat: { namespace: 'voice', method: 'sendVoiceTextToChat' },
   onVoiceTextReceived: { namespace: 'voice', method: 'onVoiceTextReceived' },
-  sendTTSSubtitle: { namespace: 'voice', method: 'sendTTSSubtitle' },
-  onTTSSubtitleReceived: { namespace: 'voice', method: 'onTTSSubtitleReceived' },
   removeAllListeners: { namespace: 'util', method: 'removeAllListeners' },
   getMainViewWindowNumber: { namespace: 'view', method: 'getMainViewWindowNumber' },
   captureWindow: { namespace: 'view', method: 'captureWindow' },

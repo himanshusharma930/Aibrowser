@@ -30,6 +30,10 @@ export function createWindow(rendererURL: string) {
       sandbox: true,                   // ✅ SECURITY FIX: Enable sandboxing
       webSecurity: true,               // Allow access to media devices like microphone
       zoomFactor: 1.0,
+      // Memory optimizations
+      backgroundThrottling: true,
+      offscreen: false,
+      spellcheck: false,
     },
   });
   console.log('Window created, loading URL...');

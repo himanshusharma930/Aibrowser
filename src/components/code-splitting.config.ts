@@ -7,7 +7,7 @@
  * Strategy:
  * 1. Modal components - lazy load on demand via dynamic/index.tsx
  * 2. Feature-specific components - lazy load when feature is accessed
- * 3. Heavy libraries (speech recognition, TTS) - on-demand import helpers
+ * 3. Heavy libraries (speech recognition) - on-demand import helpers
  * 4. Scheduled task components - lazy load in home page only
  */
 
@@ -49,8 +49,6 @@ export async function importFeatureModule(featureName: string) {
   switch (featureName) {
     case 'speech':
       return import('@/lib/speechRecognition');
-    case 'tts':
-      return import('@/lib/ttsPlayer');
     case 'xiaohongshu':
       return import('@/lib/xiaohongshu');
     case 'douyin':

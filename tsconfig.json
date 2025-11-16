@@ -43,6 +43,7 @@
     "node_modules",
     "electron",
     "docs",
-    "eko"
+    "eko",
+    "__tests__/temp"
   ]
 }
