@@ -6,7 +6,7 @@ import { ipcRenderer } from 'electron';
  */
 
 export class BatchMessageHandler {
-  private handlers = new Map<string, Function[]>();
+  private handlers = new Map<string, Array<(data: any) => void>>();
   private messageQueue: any[] = [];
   private isProcessing = false;
 
@@ -33,7 +33,7 @@ export class BatchMessageHandler {
   /**
    * Unregister a handler
    */
-  public off(channel: string, callback: Function): void {
+  public off(channel: string, callback: (data: any) => void): void {
     const handlers = this.handlers.get(channel);
     if (handlers) {
       const index = handlers.indexOf(callback);
@@ -189,26 +189,25 @@ export function getBatchMessageHandler(): BatchMessageHandler {
 }
 
 // Example usage in React component:
-/*
-import { useEffect } from 'react';
-import { getBatchMessageHandler } from './batch-message-handler';
-
-export function ChatComponent() {
-  const handler = getBatchMessageHandler();
-
-  useEffect(() => {
-    const handleStreamMessage = (data: any) => {
-      console.log('Received:', data);
-      // Update UI with message
-    };
-
-    handler.on('eko-stream-message', handleStreamMessage);
-
-    return () => {
-      handler.off('eko-stream-message', handleStreamMessage);
-    };
-  }, []);
-
-  return <div>{/* chat UI */}</div>;
-}
-*/
+// 
+// import { useEffect } from 'react';
+// import { getBatchMessageHandler } from './batch-message-handler';
+// 
+// export function ChatComponent() {
+//   const handler = getBatchMessageHandler();
+// 
+//   useEffect(() => {
+//     const handleStreamMessage = (data) => {
+//       console.log('Received:', data);
+//       // Update UI with message
+//     };
+// 
+//     handler.on('eko-stream-message', handleStreamMessage);
+// 
+//     return () => {
+//       handler.off('eko-stream-message', handleStreamMessage);
+//     };
+//   }, []);
+// 
+//   return null; // Your chat UI here
+// }

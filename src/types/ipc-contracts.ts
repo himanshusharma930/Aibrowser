@@ -109,7 +109,7 @@ export const AgentConfigSchema = z.object({
     z.string(),
     z.object({
       enabled: z.boolean(),
-      config: z.record(z.unknown()).optional()
+      config: z.record(z.string(), z.unknown()).optional()
     })
   )
 });
@@ -187,6 +187,96 @@ export const SendTTSSubtitleSchema = z.object({
     .min(1, 'Subtitle text cannot be empty')
     .max(500, 'Subtitle text too long'),
   isStart: z.boolean()
+});
+
+// ========================================
+// Additional View Service Schemas
+// ========================================
+
+export const SetDetailViewVisibleBoolSchema = z.boolean();
+
+export const NavigateToBoundsSchema = z.object({
+  x: z.number().int().min(0),
+  y: z.number().int().min(0),
+  width: z.number().int().min(100).max(10000),
+  height: z.number().int().min(100).max(10000)
+});
+
+// ========================================
+// Agent Context Schemas
+// ========================================
+
+export const SaveAgentStateSchema = z.object({
+  windowId: z.number().int().min(0),
+  agentName: z.string()
+    .min(1, 'Agent name is required')
+    .max(100, 'Agent name too long'),
+  variables: z.record(z.string(), z.unknown()),
+  sessionState: z.unknown().optional()
+});
+
+export const GetAgentStateSchema = z.object({
+  windowId: z.number().int().min(0),
+  agentName: z.string()
+    .min(1, 'Agent name is required')
+    .max(100, 'Agent name too long')
+});
+
+export const SetGlobalVarSchema = z.object({
+  windowId: z.number().int().min(0),
+  key: z.string()
+    .min(1, 'Variable key is required')
+    .max(100, 'Variable key too long'),
+  value: z.unknown()
+});
+
+export const GetGlobalVarSchema = z.object({
+  windowId: z.number().int().min(0),
+  key: z.string()
+    .min(1, 'Variable key is required')
+    .max(100, 'Variable key too long')
+});
+
+// ========================================
+// MCP Tool Schemas
+// ========================================
+
+export const MCPServerSchema = z.object({
+  name: z.string()
+    .min(1, 'Server name is required')
+    .max(100, 'Server name too long'),
+  url: z.string()
+    .url('Invalid server URL'),
+  type: z.enum(['sse', 'stdio', 'websocket']).optional(),
+  enabled: z.boolean().optional(),
+  config: z.record(z.string(), z.unknown()).optional()
+});
+
+export const GetMCPServerSchema = z.object({
+  serverId: z.string()
+    .min(1, 'Server ID is required')
+    .max(100, 'Server ID too long')
+});
+
+export const SetToolEnabledSchema = z.object({
+  toolName: z.string()
+    .min(1, 'Tool name is required')
+    .max(100, 'Tool name too long'),
+  enabled: z.boolean()
+});
+
+// ========================================
+// Error Tracking Schemas
+// ========================================
+
+export const GetRecentErrorsSchema = z.object({
+  count: z.number().int().min(1).max(1000).optional().default(50)
+});
+
+export const GetErrorsByCategorySchema = z.object({
+  category: z.string()
+    .min(1, 'Category is required')
+    .max(100, 'Category too long')
 });
 
 // ========================================

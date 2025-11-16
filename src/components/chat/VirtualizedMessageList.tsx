@@ -49,7 +49,7 @@ export const VirtualizedMessageList: React.FC<VirtualizedMessageListProps> = ({
   'aria-label': ariaLabel = 'Message list'
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const scrollTimeoutRef = useRef<NodeJS.Timeout>();
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const [scrollState, setScrollState] = useState<ScrollState>({
     isAtBottom: true,
     isUserScrolling: false,

@@ -9,6 +9,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ArrowLeftOutlined, ArrowRightOutlined, ReloadOutlined, MenuOutlined, MessageOutlined } from '@ant-design/icons';
 import { Button, Input, Tooltip } from 'antd';
 import { useLayoutStore } from '@/stores/layoutStore';
+import { useIpcListener } from '@/hooks/useIpcListener';
 import styles from './NavigationBar.module.css';
 
 interface NavigationBarProps {
@@ -39,64 +40,51 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
   const leftPanelExpanded = useLayoutStore((state) => state.leftPanel.isExpanded);
   const rightPanelExpanded = useLayoutStore((state) => state.rightPanel.isExpanded);
 
-  // Listen for URL changes from Electron
+  // Listen for URL changes from Electron using the useIpcListener hook
+  useIpcListener('url-changed', (url: string) => {
+    setCurrentUrl(url);
+    setAddressValue(url);
+  });
+
+  // Get initial URL on mount
   useEffect(() => {
-    if (typeof window === 'undefined' || !window.api?.view?.onUrlChange) {
-      return;
+    if (typeof window !== 'undefined' && window.api?.view?.getCurrentUrl) {
+      window.api.view.getCurrentUrl()
+        .then((url) => {
+          setCurrentUrl(url);
+          setAddressValue(url);
+        })
+        .catch((error) => {
+          console.error('[NavigationBar] Failed to get current URL:', error);
+        });
     }
-
-    window.api.view.onUrlChange((url: string) => {
-      setCurrentUrl(url);
-      setAddressValue(url);
-    });
-
-    // Get initial URL
-    window.api.view.getCurrentUrl().then((url) => {
-      setCurrentUrl(url);
-      setAddressValue(url);
-    }).catch((error) => {
-      console.error('[NavigationBar] Failed to get current URL:', error);
-    });
-
-    return () => {
-      // Cleanup if needed
-    };
   }, []);
 
-  // Listen for navigation events from Electron menu
+  // Handle navigation events from Electron menu
+  const handleNavigateBack = useCallback(() => {
+    handleBackClick();
+  }, []);
+
+  const handleNavigateForward = useCallback(() => {
+    handleForwardClick();
+  }, []);
+
+  const handleReload = useCallback(() => {
+    handleReloadClick();
+  }, []);
+
   useEffect(() => {
     if (typeof window === 'undefined' || !window.api) {
       return;
     }
 
-    const handleNavigateBack = () => {
-      handleBackClick();
-    };
-
-    const handleNavigateForward = () => {
-      handleForwardClick();
-    };
-
-    const handleReload = () => {
-      handleReloadClick();
-    };
-
-    if (window.api.onNavigateBack) {
-      window.api.onNavigateBack(handleNavigateBack);
+    // Register navigation handlers via utility API
+    if (typeof window !== 'undefined' && window.api?.util) {
+      window.api.util.onNavigateBack(handleNavigateBack);
+      window.api.util.onNavigateForward(handleNavigateForward);
+      window.api.util.onReloadPage(handleReload);
     }
-
-    if (window.api.onNavigateForward) {
-      window.api.onNavigateForward(handleNavigateForward);
-    }
-
-    if (window.api.onReloadPage) {
-      window.api.onReloadPage(handleReload);
-    }
-
-    return () => {
-      // Cleanup if needed
-    };
-  }, []);
+  }, [handleNavigateBack, handleNavigateForward, handleReload]);
 
   /**
    * Handle back button click
@@ -177,10 +165,16 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
       // Navigate via IPC if available
       if (typeof window !== 'undefined' && window.api?.view?.navigateTo) {
         window.api.view.navigateTo(targetUrl)
-          .then((result) => {
-            setCurrentUrl(result.url);
-            setAddressValue(result.url);
-            setCanGoBack(true);
+          .then(async (result) => {
+            if (result.success) {
+              // Get the current URL after navigation
+              const currentUrl = await window.api.view.getCurrentUrl();
+              setCurrentUrl(currentUrl);
+              setAddressValue(currentUrl);
+              setCanGoBack(true);
+            } else {
+              console.error('[NavigationBar] Navigation failed:', result.error);
+            }
           })
           .catch((error) => {
             console.error('[NavigationBar] Navigation failed:', error);

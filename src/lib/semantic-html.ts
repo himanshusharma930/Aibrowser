@@ -231,7 +231,7 @@ export class LandmarkManager {
       return true;
     }
     return false;
-  },
+  }
 
   /**
    * Create landmark navigation menu
@@ -286,7 +286,7 @@ export class DocumentOutlineGenerator {
     });
 
     return outline;
-  },
+  }
 
   /**
    * Generate HTML table of contents
@@ -297,10 +297,10 @@ export class DocumentOutlineGenerator {
     toc.id = containerId;
     toc.setAttribute('aria-label', 'Table of contents');
 
-    const list = document.createElement('ul');
+    const list = document.createElement('ul') as any;
     let currentLevel = 0;
-    let currentList = list;
-    const listStack: HTMLElement[] = [list];
+    let currentList: any = list;
+    const listStack: any[] = [list];
 
     outline.forEach((item, index) => {
       // Adjust nesting level
@@ -328,6 +328,7 @@ export class DocumentOutlineGenerator {
       const li = document.createElement('li');
       const link = document.createElement('a');
       link.textContent = item.text;
+
       link.href = '#';
       link.addEventListener('click', (e) => {
         e.preventDefault();
@@ -392,7 +393,7 @@ export class SemanticValidator {
     }
 
     // Validate heading hierarchy
-    const headingHierarchy = this.validateHeadingHierarchy(headings);
+    const headingHierarchy = this.validateHeadingHierarchy(headings as HTMLElement[]);
     if (!headingHierarchy.isValid) {
       issues.push(...headingHierarchy.issues);
     }
@@ -410,7 +411,7 @@ export class SemanticValidator {
         listCount: lists.length
       }
     };
-  },
+  }
 
   /**
    * Validate heading hierarchy

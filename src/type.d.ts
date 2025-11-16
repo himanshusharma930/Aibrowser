@@ -79,6 +79,7 @@ export interface PanelLayoutState {
 
 // Layout mode types for progressive disclosure
 export type LayoutMode = 'full-width' | 'split';
+export type LayoutStage = 1 | 2 | 3 | 4;
 
 export interface LayoutTransitionConfig {
   duration: number;          // Animation duration in ms
@@ -292,6 +293,12 @@ interface ViewAPI {
   goForward: () => Promise<{ success: boolean; error?: string }>
   reload: () => Promise<{ success: boolean; error?: string }>
   getNavigationState: () => Promise<{ canGoBack: boolean; canGoForward: boolean }>
+  getWindowSize: () => Promise<{ width: number; height: number }>
+  onNavigateBack: (callback: () => void) => void
+  onNavigateForward: (callback: () => void) => void
+  onReloadPage: (callback: () => void) => void
+  onFileUpdated: (callback: (status: string, content: string) => void) => void
+  updateBrowserPreviewBounds: (bounds: BrowserPreviewBounds) => Promise<void>
 }
 
 interface ConfigAPI {
@@ -346,6 +353,16 @@ interface UtilityAPI {
   onTaskExecutionComplete: (callback: (event: any) => void) => void
   onOpenHistoryPanel: (callback: (event: any) => void) => void
   onTaskAbortedBySystem: (callback: (event: any) => void) => void
+  onNavigateBack: (callback: () => void) => void
+  onNavigateForward: (callback: () => void) => void
+  onReloadPage: (callback: () => void) => void
+  onFileUpdated: (callback: (status: string, content: string) => void) => void
+}
+
+interface LayoutAPI {
+  savePanelState: (state: Record<string, any>) => Promise<void>
+  loadPanelState: () => Promise<Record<string, any> | null>
+  updateBrowserPreviewBounds: (bounds: BrowserPreviewBounds) => Promise<void>
 }
 
 declare global {
@@ -360,6 +377,7 @@ declare global {
       history: HistoryAPI
       voice: VoiceAPI
       util: UtilityAPI
+      layout: LayoutAPI
 
       // DEPRECATED: Legacy flat API for backward compatibility
       // These will be removed in a future version
@@ -404,7 +422,7 @@ declare global {
       /** @deprecated Use api.eko.execute instead */
       ekoExecute: (taskId: string) => Promise<any>
       /** @deprecated Use api.eko.onStreamMessage instead */
-      onEkoStreamMessage: (callback: (message: any) => void) => void
+      onEkoStreamMessage: (callback: (event: any, message: any) => void) => void
       /** @deprecated Use api.eko.getTaskStatus instead */
       ekoGetTaskStatus: (taskId: string) => Promise<any>
       /** @deprecated Use api.eko.cancelTask instead */
@@ -497,4 +515,74 @@ declare global {
   }
 }
 
-export {} 
+// Browser tab management types
+export interface BrowserTab {
+  id: string;
+  title: string;
+  url: string;
+  favicon?: string;
+  lastActive?: number;
+  lastAccessedAt?: number;
+  isPinned?: boolean;
+  workspaceId?: string;
+  createdAt?: number;
+}
+
+// Workspace management types
+export interface Workspace {
+  id: string;
+  name: string;
+  icon?: string;
+  tabs: BrowserTab[];
+  tabIds?: string[];
+  createdAt: number;
+  updatedAt: number;
+  lastAccessedAt?: number;
+  isActive?: boolean;
+}
+
+// Favorites management types
+export interface Favorite {
+  id: string;
+  title: string;
+  url: string;
+  favicon?: string;
+  addedAt: number;
+  category?: string;
+  order?: number;
+}
+
+// Browser state types
+export interface BrowserTabState {
+  id: string;
+  title: string;
+  url: string;
+}
+
+// Layout state types
+export interface LayoutState {
+  isExpanded: boolean;
+  panelSize: number;
+}
+
+export interface PanelState {
+  visible?: boolean;
+  isExpanded?: boolean;
+  width?: number;
+  height?: number;
+  isDragging?: boolean;
+  minWidth?: number;
+  maxWidth?: number;
+  collapsedWidth?: number;
+}
+
+export interface BrowserPreviewBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  marginLeft?: number;
+  marginRight?: number;
+}
+
+export {}

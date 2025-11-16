@@ -97,7 +97,7 @@ export function createWindowCaptureStreamUsing(
       }
 
       // Draw to Canvas
-      const imgData = new ImageData(rgba, width, height);
+      const imgData = new ImageData(rgba as any, width, height);
       (ctx as any).putImageData(imgData, 0, 0);
 
       // Use WebCodecs to generate VideoFrame and write to track

@@ -47,8 +47,7 @@ export default async function handler(
         ...(apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {}),
         'Content-Type': 'application/json',
       },
-      timeout: 10000, // 10 second timeout
-    });
+    } as any);
 
     if (!response.ok) {
       console.error(`[API] Failed to fetch models: HTTP ${response.status}`);

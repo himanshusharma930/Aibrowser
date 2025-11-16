@@ -36,7 +36,11 @@ const api = {
     execute: (taskId: string) => ipcRenderer.invoke(IPC_CHANNELS.EKO.EXECUTE, { taskId }), // ✅ SECURITY FIX
     getTaskStatus: (taskId: string) => ipcRenderer.invoke(IPC_CHANNELS.EKO.GET_TASK_STATUS, { taskId }), // ✅ SECURITY FIX
     cancelTask: (taskId: string) => ipcRenderer.invoke(IPC_CHANNELS.EKO.CANCEL_TASK, { taskId }), // ✅ SECURITY FIX
-    onStreamMessage: (callback: (message: any) => void) => ipcRenderer.on(IPC_CHANNELS.EKO.STREAM_MESSAGE, (_, message) => callback(message)),
+    onStreamMessage: (callback: (message: any) => void) => {
+      const listener = (_: any, message: any) => callback(message);
+      ipcRenderer.on(IPC_CHANNELS.EKO.STREAM_MESSAGE, listener);
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.EKO.STREAM_MESSAGE, listener);
+    },
 
     // ✅ NEW: Checkpoint-aware execution for pause/resume
     ekoRunCheckpoint: (prompt: string, options?: { checkpointInterval?: number; agents?: string[] }) =>
@@ -51,8 +55,10 @@ const api = {
       ipcRenderer.invoke('eko:list-checkpoints'),
     ekoDeleteCheckpoint: (taskId: string) =>
       ipcRenderer.invoke('eko:delete-checkpoint', { taskId }),
-    onEkoStreamMessage: (callback: (event: any, message: any) => void) =>
-      ipcRenderer.on('eko-stream-message', callback),
+    onEkoStreamMessage: (callback: (event: any, message: any) => void) => {
+      ipcRenderer.on('eko-stream-message', callback);
+      return () => ipcRenderer.removeListener('eko-stream-message', callback);
+    },
   },
 
   view: {
@@ -67,7 +73,11 @@ const api = {
     sendToMainViewExecuteCode: (func: string, args: any[]) => ipcRenderer.invoke(IPC_CHANNELS.VIEW.SEND_TO_MAIN_VIEW_EXECUTE_CODE, func, args),
     navigateTo: (url: string) => ipcRenderer.invoke(IPC_CHANNELS.VIEW.NAVIGATE_TO, url),
     getCurrentUrl: () => ipcRenderer.invoke(IPC_CHANNELS.VIEW.GET_CURRENT_URL),
-    onUrlChange: (callback: (url: string) => void) => ipcRenderer.on(IPC_CHANNELS.VIEW.URL_CHANGED, (_, url) => callback(url)),
+    onUrlChange: (callback: (url: string) => void) => {
+      const listener = (_: any, url: string) => callback(url);
+      ipcRenderer.on(IPC_CHANNELS.VIEW.URL_CHANGED, listener);
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.VIEW.URL_CHANGED, listener);
+    },
     getMainViewWindowNumber: () => ipcRenderer.invoke(IPC_CHANNELS.VIEW.GET_MAIN_VIEW_WINDOW_NUMBER),
     captureWindow: (winNo: number, scale?: number) => ipcRenderer.invoke(IPC_CHANNELS.VIEW.CAPTURE_WINDOW, winNo, scale),
     captureWindowSync: (winNo: number, scale?: number) => ipcRenderer.sendSync(IPC_CHANNELS.VIEW.CAPTURE_WINDOW_SYNC, winNo, scale),
@@ -162,10 +172,17 @@ const api = {
 
   voice: {
     sendVoiceTextToChat: (text: string) => ipcRenderer.invoke(IPC_CHANNELS.VOICE.SEND_VOICE_TEXT_TO_CHAT, text),
-    onVoiceTextReceived: (callback: (text: string) => void) => ipcRenderer.on(IPC_CHANNELS.VOICE.VOICE_TEXT_RECEIVED, (_, text) => callback(text)),
+    onVoiceTextReceived: (callback: (text: string) => void) => {
+      const listener = (_: any, text: string) => callback(text);
+      ipcRenderer.on(IPC_CHANNELS.VOICE.VOICE_TEXT_RECEIVED, listener);
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.VOICE.VOICE_TEXT_RECEIVED, listener);
+    },
     sendTTSSubtitle: (text: string, isStart: boolean) => ipcRenderer.invoke(IPC_CHANNELS.VOICE.SEND_TTS_SUBTITLE, text, isStart),
-    onTTSSubtitleReceived: (callback: (text: string, isStart: boolean) => void) =>
-      ipcRenderer.on(IPC_CHANNELS.VOICE.TTS_SUBTITLE_RECEIVED, (_, text, isStart) => callback(text, isStart)),
+    onTTSSubtitleReceived: (callback: (text: string, isStart: boolean) => void) => {
+      const listener = (_: any, text: string, isStart: boolean) => callback(text, isStart);
+      ipcRenderer.on(IPC_CHANNELS.VOICE.TTS_SUBTITLE_RECEIVED, listener);
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.VOICE.TTS_SUBTITLE_RECEIVED, listener);
+    },
   },
 
   util: {
@@ -245,19 +262,15 @@ const deprecatedApiMappings = {
 // Extend api object with deprecated methods using factory pattern
 Object.assign(api, createDeprecatedAPIProxy(api, deprecatedApiMappings))
 
-// Use `contextBridge` APIs to expose Electron APIs to
-// renderer only if context isolation is enabled, otherwise
-// just add to the DOM global.
-if (process.contextIsolated) {
-  try {
-    contextBridge.exposeInMainWorld('electron', electronAPI)
-    contextBridge.exposeInMainWorld('api', api)
-  } catch (error) {
-    console.error(error)
-  }
-} else {
-  // @ts-ignore (define in dts)
-  window.electron = electronAPI
-  // @ts-ignore (define in dts)
-  window.api = api
+// Security: Always require context isolation
+if (!process.contextIsolated) {
+  throw new Error('Context isolation must be enabled for security')
+}
+
+try {
+  contextBridge.exposeInMainWorld('electron', electronAPI)
+  contextBridge.exposeInMainWorld('api', api)
+} catch (error) {
+  console.error('Failed to expose APIs to renderer:', error)
+  throw error
 } 

@@ -7,7 +7,7 @@
 
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import type { LayoutState, LayoutStage, PanelState, BrowserPreviewBounds } from '@/type';
+import type { LayoutStage, PanelState, BrowserPreviewBounds } from '@/type';
 
 // Constants
 const NAV_BAR_HEIGHT = 60;
@@ -76,6 +76,19 @@ interface LayoutActions {
   resetToDefaults: () => void;
 }
 
+interface LayoutStateData {
+  leftPanel: PanelState;
+  rightPanel: PanelState;
+  browserPreview: BrowserPreviewBounds;
+  currentStage: LayoutStage | number;
+  navigationBarHeight: number;
+  windowWidth: number;
+  windowHeight: number;
+  animationDuration: number;
+  isTransitioning: boolean;
+}
+
+type LayoutState = LayoutStateData;
 type LayoutStore = LayoutState & LayoutActions;
 
 /**
@@ -98,8 +111,8 @@ function calculateBounds(
   windowHeight: number,
   navBarHeight: number
 ): BrowserPreviewBounds {
-  const leftWidth = leftPanel.isExpanded ? leftPanel.width : leftPanel.collapsedWidth;
-  const rightWidth = rightPanel.isExpanded ? rightPanel.width : rightPanel.collapsedWidth;
+  const leftWidth = leftPanel.isExpanded ? (leftPanel.width ?? 0) : (leftPanel.collapsedWidth ?? 0);
+  const rightWidth = rightPanel.isExpanded ? (rightPanel.width ?? 0) : (rightPanel.collapsedWidth ?? 0);
 
   const browserWidth = windowWidth - leftWidth - rightWidth;
   const browserHeight = windowHeight - navBarHeight;
@@ -204,7 +217,7 @@ export const useLayoutStore = create<LayoutStore>()(
           LEFT_PANEL_MIN_WIDTH,
           LEFT_PANEL_MAX_WIDTH,
           state.windowWidth,
-          state.rightPanel.isExpanded ? state.rightPanel.width : 0
+          state.rightPanel.isExpanded ? (state.rightPanel.width ?? 0) : 0
         );
 
         set({
@@ -215,7 +228,7 @@ export const useLayoutStore = create<LayoutStore>()(
         get().calculateBrowserBounds();
 
         // Persist state (debounced in actual implementation)
-        if (!state.leftPanel.isDragging) {
+        if (!(state.leftPanel.isDragging ?? false)) {
           get().persistState();
         }
       },
@@ -227,7 +240,7 @@ export const useLayoutStore = create<LayoutStore>()(
           RIGHT_PANEL_MIN_WIDTH,
           RIGHT_PANEL_MAX_WIDTH,
           state.windowWidth,
-          state.leftPanel.isExpanded ? state.leftPanel.width : 0
+          state.leftPanel.isExpanded ? (state.leftPanel.width ?? 0) : 0
         );
 
         set({
@@ -238,7 +251,7 @@ export const useLayoutStore = create<LayoutStore>()(
         get().calculateBrowserBounds();
 
         // Persist state (debounced in actual implementation)
-        if (!state.rightPanel.isDragging) {
+        if (!(state.rightPanel.isDragging ?? false)) {
           get().persistState();
         }
       },
@@ -288,8 +301,8 @@ export const useLayoutStore = create<LayoutStore>()(
         );
 
         const currentStage = calculateStage(
-          state.leftPanel.isExpanded,
-          state.rightPanel.isExpanded
+          state.leftPanel.isExpanded ?? false,
+          state.rightPanel.isExpanded ?? false
         );
 
         set({
@@ -307,7 +320,7 @@ export const useLayoutStore = create<LayoutStore>()(
 
       calculateCurrentStage: () => {
         const state = get();
-        return calculateStage(state.leftPanel.isExpanded, state.rightPanel.isExpanded);
+        return calculateStage(state.leftPanel.isExpanded ?? false, state.rightPanel.isExpanded ?? false);
       },
 
       persistState: async () => {

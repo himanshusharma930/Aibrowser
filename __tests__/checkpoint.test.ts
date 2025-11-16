@@ -31,7 +31,7 @@ describe('TaskCheckpointManager', () => {
         [],
         { variables: {}, sessionState: {} },
         { variables: {} },
-        { iteration: 0, totalIterations: 10 }
+        { iteration: 0, totalIterations: 10, toolResults: [] }
       );
 
       expect(checkpoint).toBeDefined();
@@ -166,7 +166,7 @@ describe('TaskCheckpointManager', () => {
         [],
         { variables: {}, sessionState: {} },
         { variables: {} },
-        { iteration: 0, totalIterations: 10 }
+        { iteration: 0, totalIterations: 10, toolResults: [] }
       );
 
       await taskCheckpointManager.updateCheckpoint(testTaskId, {
@@ -191,7 +191,7 @@ describe('TaskCheckpointManager', () => {
         ['n1', 'n2'],
         { variables: {}, sessionState: {} },
         { variables: {} },
-        { iteration: 2, totalIterations: 10 }
+        { iteration: 2, totalIterations: 10, toolResults: [] }
       );
 
       await taskCheckpointManager.pauseCheckpoint(testTaskId);
@@ -210,7 +210,7 @@ describe('TaskCheckpointManager', () => {
         ['n1'],
         { variables: {}, sessionState: {} },
         { variables: {} },
-        { iteration: 1, totalIterations: 10 }
+        { iteration: 1, totalIterations: 10, toolResults: [] }
       );
 
       const error = { message: 'Network timeout', code: 'NET_TIMEOUT' };
@@ -230,7 +230,7 @@ describe('TaskCheckpointManager', () => {
         [],
         { variables: {}, sessionState: {} },
         { variables: {} },
-        { iteration: 0, totalIterations: 10 }
+        { iteration: 0, totalIterations: 10, toolResults: [] }
       );
 
       const error = { message: 'Error 1', code: 'ERR_1' };
@@ -256,7 +256,7 @@ describe('TaskCheckpointManager', () => {
         ['n1', 'n2', 'n3', 'n4', 'n5', 'n6', 'n7', 'n8', 'n9', 'n10'],
         { variables: {}, sessionState: {} },
         { variables: {} },
-        { iteration: 10, totalIterations: 10 }
+        { iteration: 10, totalIterations: 10, toolResults: [] }
       );
 
       const result = { success: true, data: 'Task completed' };
@@ -276,7 +276,7 @@ describe('TaskCheckpointManager', () => {
         ['n1', 'n2', 'n3'],
         { variables: {}, sessionState: {} },
         { variables: {} },
-        { iteration: 3, totalIterations: 10 }
+        { iteration: 3, totalIterations: 10, toolResults: [] }
       );
 
       const status = await taskCheckpointManager.getCheckpointStatus(testTaskId);
@@ -304,7 +304,7 @@ describe('TaskCheckpointManager', () => {
         [],
         { variables: {}, sessionState: {} },
         { variables: {} },
-        { iteration: 0, totalIterations: 10 }
+        { iteration: 0, totalIterations: 10, toolResults: [] }
       );
 
       await taskCheckpointManager.createCheckpoint(
@@ -314,7 +314,7 @@ describe('TaskCheckpointManager', () => {
         [],
         { variables: {}, sessionState: {} },
         { variables: {} },
-        { iteration: 5, totalIterations: 20 }
+        { iteration: 5, totalIterations: 20, toolResults: [] }
       );
 
       const checkpoints = await taskCheckpointManager.listCheckpoints();
@@ -348,7 +348,7 @@ describe('TaskCheckpointManager', () => {
         [],
         { variables: {}, sessionState: {} },
         { variables: {} },
-        { iteration: 0, totalIterations: 10 }
+        { iteration: 0, totalIterations: 10, toolResults: [] }
       );
 
       const filePath = path.join(testCheckpointsDir, `${testTaskId}.json`);
@@ -428,7 +428,7 @@ describe('TaskCheckpointManager', () => {
         ['n1', 'n2'],
         { variables: { key: 'value' }, sessionState: {} },
         { variables: {} },
-        { iteration: 2, totalIterations: 3 }
+        { iteration: 2, totalIterations: 3, toolResults: [] }
       );
 
       await taskCheckpointManager.pauseCheckpoint(testTaskId);
@@ -449,7 +449,7 @@ describe('TaskCheckpointManager', () => {
         ['n1'],
         { variables: {}, sessionState: {} },
         { variables: {} },
-        { iteration: 1, totalIterations: 5 }
+        { iteration: 1, totalIterations: 5, toolResults: [] }
       );
 
       await taskCheckpointManager.failCheckpoint(
@@ -473,7 +473,7 @@ describe('TaskCheckpointManager', () => {
         [],
         { variables: {}, sessionState: {} },
         { variables: {} },
-        { iteration: 5, totalIterations: 5 }
+        { iteration: 5, totalIterations: 5, toolResults: [] }
       );
 
       await taskCheckpointManager.completeCheckpoint(testTaskId, { success: true });
@@ -511,7 +511,7 @@ describe('TaskCheckpointManager', () => {
         [],
         complexContext,
         { variables: { global: 'data' } },
-        { iteration: 0, totalIterations: 10 }
+        { iteration: 0, totalIterations: 10, toolResults: [] }
       );
 
       await taskCheckpointManager.persistCheckpoint(checkpoint);

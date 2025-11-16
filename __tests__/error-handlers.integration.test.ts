@@ -50,7 +50,7 @@ describe('Error IPC Handlers Integration', () => {
       errorHandler.handle('Error 3', ErrorCategory.STORAGE, ErrorSeverity.HIGH);
 
       const handler = mockHandlers.get('error:get-recent-errors');
-      const result = await handler(null, 10);
+      const result = await handler!(null, 10);
 
       expect(result.success).toBe(true);
       expect(result.errors).toHaveLength(3);
@@ -64,7 +64,7 @@ describe('Error IPC Handlers Integration', () => {
       }
 
       const handler = mockHandlers.get('error:get-recent-errors');
-      const result = await handler(null, 5);
+      const result = await handler!(null, 5);
 
       expect(result.errors.length).toBeLessThanOrEqual(5);
     });
@@ -73,7 +73,7 @@ describe('Error IPC Handlers Integration', () => {
       errorHandler.handle('Test error', ErrorCategory.IPC, ErrorSeverity.LOW);
 
       const handler = mockHandlers.get('error:get-recent-errors');
-      const result = await handler(null); // No count parameter
+      const result = await handler!(null); // No count parameter
 
       expect(result.success).toBe(true);
       expect(result.count).toBeGreaterThanOrEqual(0);
@@ -81,7 +81,7 @@ describe('Error IPC Handlers Integration', () => {
 
     test('should handle empty error log', async () => {
       const handler = mockHandlers.get('error:get-recent-errors');
-      const result = await handler(null, 10);
+      const result = await handler!(null, 10);
 
       expect(result.success).toBe(true);
       expect(result.errors).toEqual([]);
@@ -90,7 +90,7 @@ describe('Error IPC Handlers Integration', () => {
     test('should handle retrieval error gracefully', async () => {
       const handler = mockHandlers.get('error:get-recent-errors');
       // Pass invalid count (negative)
-      const result = await handler(null, -1);
+      const result = await handler!(null, -1);
 
       expect(result.success).toBe(true); // Should handle gracefully
       expect(Array.isArray(result.errors)).toBe(true);
@@ -111,7 +111,7 @@ describe('Error IPC Handlers Integration', () => {
       errorHandler.handle('Agent Error', ErrorCategory.AGENT, ErrorSeverity.HIGH);
 
       const handler = mockHandlers.get('error:get-errors-by-category');
-      const result = await handler(null, ErrorCategory.IPC);
+      const result = await handler!(null, ErrorCategory.IPC);
 
       expect(result.success).toBe(true);
       expect(result.category).toBe(ErrorCategory.IPC);
@@ -123,7 +123,7 @@ describe('Error IPC Handlers Integration', () => {
       errorHandler.handle('IPC Error', ErrorCategory.IPC, ErrorSeverity.LOW);
 
       const handler = mockHandlers.get('error:get-errors-by-category');
-      const result = await handler(null, ErrorCategory.AGENT);
+      const result = await handler!(null, ErrorCategory.AGENT);
 
       expect(result.success).toBe(true);
       expect(result.errors).toEqual([]);
@@ -150,7 +150,7 @@ describe('Error IPC Handlers Integration', () => {
       const handler = mockHandlers.get('error:get-errors-by-category');
 
       for (const category of categories) {
-        const result = await handler(null, category);
+        const result = await handler!(null, category);
         expect(result.success).toBe(true);
         expect(result.category).toBe(category);
         expect(result.errors.length).toBeGreaterThan(0);
@@ -172,7 +172,7 @@ describe('Error IPC Handlers Integration', () => {
       errorHandler.handle('Error 3', ErrorCategory.IPC, ErrorSeverity.MEDIUM);
 
       const handler = mockHandlers.get('error:export-report');
-      const result = await handler(null);
+      const result = await handler!(null);
 
       expect(result.success).toBe(true);
       expect(result.report).toBeDefined();
@@ -187,7 +187,7 @@ describe('Error IPC Handlers Integration', () => {
       errorHandler.handle('Error 2', ErrorCategory.IPC, ErrorSeverity.HIGH);
 
       const handler = mockHandlers.get('error:export-report');
-      const result = await handler(null);
+      const result = await handler!(null);
 
       expect(result.report.stats.totalErrors).toBeGreaterThanOrEqual(2);
       expect(result.report.stats.highestSeverity).toBe(ErrorSeverity.CRITICAL);
@@ -196,7 +196,7 @@ describe('Error IPC Handlers Integration', () => {
 
     test('should handle export with empty logs', async () => {
       const handler = mockHandlers.get('error:export-report');
-      const result = await handler(null);
+      const result = await handler!(null);
 
       expect(result.success).toBe(true);
       expect(result.report.stats.totalErrors).toBe(0);
@@ -218,7 +218,7 @@ describe('Error IPC Handlers Integration', () => {
       expect(errorHandler.getTotalErrorCount()).toBeGreaterThan(0);
 
       const handler = mockHandlers.get('error:clear-logs');
-      const result = await handler(null);
+      const result = await handler!(null);
 
       expect(result.success).toBe(true);
       expect(result.clearedCount).toBeGreaterThan(0);
@@ -228,7 +228,7 @@ describe('Error IPC Handlers Integration', () => {
 
     test('should handle clearing empty logs', async () => {
       const handler = mockHandlers.get('error:clear-logs');
-      const result = await handler(null);
+      const result = await handler!(null);
 
       expect(result.success).toBe(true);
       expect(result.clearedCount).toBe(0);
@@ -249,7 +249,7 @@ describe('Error IPC Handlers Integration', () => {
       errorHandler.handle('Error 3', ErrorCategory.STORAGE, ErrorSeverity.HIGH);
 
       const handler = mockHandlers.get('error:get-statistics');
-      const result = await handler(null);
+      const result = await handler!(null);
 
       expect(result.success).toBe(true);
       expect(result.stats).toBeDefined();
@@ -265,7 +265,7 @@ describe('Error IPC Handlers Integration', () => {
       errorHandler.handle('Error 3', ErrorCategory.AGENT, ErrorSeverity.HIGH);
 
       const handler = mockHandlers.get('error:get-statistics');
-      const result = await handler(null);
+      const result = await handler!(null);
 
       expect(result.stats.errorsByCategory[ErrorCategory.IPC]).toBe(2);
       expect(result.stats.errorsByCategory[ErrorCategory.AGENT]).toBe(1);
@@ -273,7 +273,7 @@ describe('Error IPC Handlers Integration', () => {
 
     test('should handle empty statistics', async () => {
       const handler = mockHandlers.get('error:get-statistics');
-      const result = await handler(null);
+      const result = await handler!(null);
 
       expect(result.success).toBe(true);
       expect(result.stats.totalErrors).toBe(0);
@@ -298,7 +298,7 @@ describe('Error IPC Handlers Integration', () => {
       );
 
       const handler = mockHandlers.get('error:get-recovery-summary');
-      const result = await handler(null, error.id);
+      const result = await handler!(null, error.id);
 
       expect(result.success).toBe(true);
       expect(result.errorInfo).toBeDefined();
@@ -316,7 +316,7 @@ describe('Error IPC Handlers Integration', () => {
       );
 
       const handler = mockHandlers.get('error:get-recovery-summary');
-      const result = await handler(null, error.id);
+      const result = await handler!(null, error.id);
 
       expect(result.recovery).toBeDefined();
       expect(result.recovery.action).toBeDefined();
@@ -324,7 +324,7 @@ describe('Error IPC Handlers Integration', () => {
 
     test('should handle non-existent error ID', async () => {
       const handler = mockHandlers.get('error:get-recovery-summary');
-      const result = await handler(null, 'non-existent-id');
+      const result = await handler!(null, 'non-existent-id');
 
       expect(result.success).toBe(false);
       expect(result.error).toBeDefined();
@@ -340,7 +340,7 @@ describe('Error IPC Handlers Integration', () => {
       );
 
       const handler = mockHandlers.get('error:get-recovery-summary');
-      const result = await handler(null, error.id);
+      const result = await handler!(null, error.id);
 
       expect(result.recovery.action).toBe('RETRY');
     });
@@ -384,7 +384,7 @@ describe('Error IPC Handlers Integration', () => {
 
       for (const { channel, args } of handlers) {
         const handler = mockHandlers.get(channel);
-        const result = await handler(null, ...args);
+        const result = await handler!(null, ...args);
         expect(result).toHaveProperty('success');
         expect(result.success).toBe(true);
       }
@@ -402,7 +402,7 @@ describe('Error IPC Handlers Integration', () => {
 
       for (const { channel, args } of handlers) {
         const handler = mockHandlers.get(channel);
-        const result = await handler(null, ...args);
+        const result = await handler!(null, ...args);
         expect(result).toHaveProperty('timestamp');
         expect(typeof result.timestamp).toBe('number');
       }
@@ -419,7 +419,7 @@ describe('Error IPC Handlers Integration', () => {
 
       const promises = Array(5)
         .fill(null)
-        .map(() => handler(null, 20));
+        .map(() => handler!(null, 20));
 
       const results = await Promise.all(promises);
 
@@ -438,7 +438,7 @@ describe('Error IPC Handlers Integration', () => {
 
       const promises = Array(5)
         .fill(null)
-        .map(() => handler(null));
+        .map(() => handler!(null));
 
       const results = await Promise.all(promises);
 
@@ -466,7 +466,7 @@ describe('Error IPC Handlers Integration', () => {
       errorHandler.handle('Agent error', ErrorCategory.AGENT, ErrorSeverity.HIGH);
 
       const handler = mockHandlers.get('error:get-recent-errors');
-      const result = await handler(null, 10);
+      const result = await handler!(null, 10);
 
       expect(result.errors.length).toBeGreaterThan(0);
       expect(callback).toHaveBeenCalled();

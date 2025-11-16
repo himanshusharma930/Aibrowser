@@ -349,7 +349,7 @@ export class AgentContextManager {
   /**
    * Cleanup old contexts (background task)
    */
-  async cleanupOldContexts(): Promise<void> {
+  async cleanupOldContexts(): Promise<number> {
     const now = Date.now();
     const toDelete: number[] = [];
 
@@ -370,6 +370,8 @@ export class AgentContextManager {
     for (const windowId of toDelete) {
       await this.clearWindowContext(windowId);
     }
+
+    return toDelete.length;
   }
 
   /**

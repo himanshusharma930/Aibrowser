@@ -33,7 +33,7 @@ export const TabList: React.FC<TabListProps> = ({
   const sortedTabs = [...tabs].sort((a, b) => {
     if (a.isPinned && !b.isPinned) return -1;
     if (!a.isPinned && b.isPinned) return 1;
-    return b.lastAccessedAt.getTime() - a.lastAccessedAt.getTime();
+    return (b.lastAccessedAt ?? 0) - (a.lastAccessedAt ?? 0);
   });
 
   /**

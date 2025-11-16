@@ -31,7 +31,10 @@ import {
   browserSetZoomTool,
   browserPinchZoomTool,
   browserKeyboardMouseComboTool,
-  browserScrollHorizontalTool
+  browserScrollHorizontalTool,
+  // Phase 6: Additional utilities
+  browserGetClickableElementsTool,
+  browserWebSearchTool
 } from "./browser-tools";
 
 // Phase 4: Import advanced browser tools
@@ -72,6 +75,8 @@ export class EkoService {
   private mcpClient!: SimpleSseMcpClient;
   private agents!: any[];
   private activeCheckpoints: Map<string, Checkpoint> = new Map();
+  private pendingCheckpointId: string | null = null;
+  private checkpointAssociatedWithRealId: boolean = false;
   // ✅ Task tracking map for getTaskStatus() (P0.8)
   private taskStatus: Map<string, { status: 'running' | 'completed' | 'failed' | 'cancelled'; progress: number; startTime: Date; endTime?: Date; error?: string }> = new Map();
   // ✅ PHASE 2: Logger instance for standardized logging
@@ -92,6 +97,10 @@ export class EkoService {
       onMessage: (message: StreamCallbackMessage): Promise<void> => {
         // ✅ PHASE 2: Use standardized logger instead of Log.info
         this.logger.debug('Stream callback received', { type: message.type, toolName: message.toolName });
+
+        if (message.taskId) {
+          void this.tryAssociatePendingCheckpoint(message.taskId);
+        }
 
         // Window destroyed, return directly to avoid errors
         if (!this.mainWindow || this.mainWindow.isDestroyed()) {
@@ -270,6 +279,10 @@ export class EkoService {
         browserAgent.addTool(browserScrollHorizontalTool);
       }
 
+      // Phase 6: Register additional utility tools
+      browserAgent.addTool(browserGetClickableElementsTool);
+      browserAgent.addTool(browserWebSearchTool);
+
       this.agents.push(browserAgent);
       // ✅ PHASE 2: Structured logging with configuration details
       this.logger.info('BrowserAgent initialized', {
@@ -278,7 +291,8 @@ export class EkoService {
         phase2Tools: 3,
         phase3Tools: 2,
         phase4Tools: ENABLE_ADVANCED_TOOLS ? 22 : 0,
-        phase5Tools: ENABLE_GESTURE_TOOLS ? 5 : 0
+        phase5Tools: ENABLE_GESTURE_TOOLS ? 5 : 0,
+        phase6Tools: 2
       });
       Log.info('Phase 2 browser tools registered: 3 tab management tools added');
       Log.info('Phase 3 browser tools registered: 2 core interaction tools added');
@@ -444,6 +458,40 @@ export class EkoService {
       detail: error?.stack || error?.toString() || errorMessage,
       taskId: taskId // Include taskId if available
     });
+  }
+
+  private async tryAssociatePendingCheckpoint(realTaskId: string): Promise<void> {
+    if (!this.pendingCheckpointId || this.checkpointAssociatedWithRealId) {
+      return;
+    }
+
+    const internalTaskId = this.pendingCheckpointId;
+    this.checkpointAssociatedWithRealId = true;
+
+    try {
+      await taskCheckpointManager.associateCheckpointWithTaskId(internalTaskId, realTaskId);
+
+      const checkpoint = this.activeCheckpoints.get(internalTaskId);
+      if (checkpoint) {
+        this.activeCheckpoints.delete(internalTaskId);
+        this.activeCheckpoints.set(realTaskId, checkpoint);
+        this.logger.debug('Active checkpoint map updated to real task id', {
+          internalTaskId,
+          realTaskId
+        });
+      }
+
+      this.pendingCheckpointId = realTaskId;
+    } catch (error: any) {
+      this.logger.error(
+        'Failed to associate checkpoint with actual task id',
+        error,
+        { internalTaskId, realTaskId },
+        ErrorCategory.STORAGE,
+        ErrorSeverity.MEDIUM,
+        true
+      );
+    }
   }
 
   /**
@@ -763,6 +811,11 @@ export class EkoService {
       }
     })();
 
+    executionPromise.finally(() => {
+      this.pendingCheckpointId = null;
+      this.checkpointAssociatedWithRealId = false;
+    });
+
     // Create initial checkpoint
     try {
       const initialCheckpoint = await taskCheckpointManager.createCheckpoint(
@@ -780,6 +833,8 @@ export class EkoService {
       );
 
       this.activeCheckpoints.set(taskId, initialCheckpoint);
+      this.pendingCheckpointId = taskId;
+      this.checkpointAssociatedWithRealId = false;
 
       // Phase 2: Initialize agent states in context
       if (agents && agents.length > 0) {

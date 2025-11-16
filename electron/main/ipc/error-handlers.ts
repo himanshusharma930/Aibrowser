@@ -56,7 +56,13 @@ export function registerErrorHandlers() {
    */
   ipcMain.handle('error:get-errors-by-category', async (_event, category: string) => {
     try {
-      const categoryErrors = errorHandler.getErrorsByCategory(category);
+      // Validate category is a valid ErrorCategory
+      const validCategories = Object.values(ErrorCategory);
+      const validatedCategory = validCategories.includes(category as ErrorCategory)
+        ? (category as ErrorCategory)
+        : ErrorCategory.UNKNOWN;
+
+      const categoryErrors = errorHandler.getErrorsByCategory(validatedCategory);
 
       // ✅ PHASE 2: Log category filter
       logger.debug('Retrieved errors by category', {
@@ -238,7 +244,7 @@ export function registerErrorHandlers() {
         errorId,
         category: errorInfo.category,
         severity: errorInfo.severity,
-        strategy: recovery.strategy
+        action: recovery.action
       });
 
       return {

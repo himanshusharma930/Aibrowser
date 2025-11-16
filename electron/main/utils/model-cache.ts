@@ -230,12 +230,13 @@ export class AIProviderModelCache {
         providers: Object.keys(providers).length,
       });
     } catch (error) {
-      logger.warn(
+      logger.error(
         'Pre-cache failed',
+        error as Error,
         { error: (error as Error).message },
         ErrorCategory.CONFIG,
         ErrorSeverity.LOW,
-        false
+        true
       );
     }
   }

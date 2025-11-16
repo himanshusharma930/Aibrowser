@@ -24,6 +24,31 @@ import { useLayoutMode } from '@/hooks/useLayoutMode';
 import { useEkoEvents } from '@/hooks/useEkoEvents';
 import { useWindowApi } from '@/hooks/useWindowApi';
 import { useEkoStreamHandler } from '@/hooks/useEkoStreamHandler';
+import { dynamicComponentClient } from '@/components/DynamicLoader';
+
+// ✅ CODE SPLITTING: Lazy load optional feature components
+const HistoryPanel = dynamicComponentClient(
+  () => import('@/components/HistoryPanel'),
+  { loading: () => null }
+);
+
+const ToolboxPanel = dynamicComponentClient(
+  () => import('@/components/ToolboxPanel'),
+  { loading: () => null }
+);
+
+// @ts-ignore - Component type inference issue
+// noinspection TypeScriptUnresolvedFunction
+const SettingsDrawer = dynamicComponentClient(
+  () => import('@/components/SettingsDrawer'),
+  { loading: () => null }
+);
+
+const AgentContextTransfer = dynamicComponentClient(
+  () => import('@/components/chat/AgentContextTransfer'),
+  { loading: () => null }
+);
+
 // Resize handle styles are now in globals.css
 
 

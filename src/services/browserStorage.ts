@@ -248,7 +248,7 @@ export const tabsStorage = {
       const transaction = db.transaction(STORE_TABS, 'readonly');
       const store = transaction.objectStore(STORE_TABS);
       const index = store.index('by-pinned');
-      const request = index.getAll(true);
+      const request = index.getAll(true as any);
 
       request.onsuccess = () => {
         resolve(request.result as BrowserTab[]);
@@ -317,7 +317,7 @@ export const workspacesStorage = {
       const transaction = db.transaction(STORE_WORKSPACES, 'readonly');
       const store = transaction.objectStore(STORE_WORKSPACES);
       const index = store.index('by-active');
-      const request = index.getAll(true);
+      const request = index.getAll(true as any);
 
       request.onsuccess = () => {
         const results = request.result as Workspace[];
@@ -347,7 +347,7 @@ export const favoritesStorage = {
   async getAll(): Promise<Favorite[]> {
     const favorites = await getAllFromStore<Favorite>(STORE_FAVORITES);
     // Sort by order
-    return favorites.sort((a, b) => a.order - b.order);
+    return favorites.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   },
 
   async getById(id: string): Promise<Favorite | undefined> {
@@ -407,13 +407,12 @@ export const browserStorage = {
         const defaultWorkspace: Workspace = {
           id: 'workspace-default',
           name: 'Main',
-          color: '#6366f1',
           icon: '🏠',
+          tabs: [],
           tabIds: [],
           isActive: true,
-          order: 0,
-          createdAt: new Date(),
-          lastAccessedAt: new Date()
+          createdAt: Date.now(),
+          updatedAt: Date.now()
         };
         await workspacesStorage.save(defaultWorkspace);
       }

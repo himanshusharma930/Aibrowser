@@ -48,7 +48,7 @@ describe('Performance IPC Handlers Integration', () => {
 
     test('should retrieve memory statistics', async () => {
       const handler = mockHandlers.get('perf:get-memory-stats');
-      const result = await handler();
+      const result = await handler!();
 
       expect(result.success).toBe(true);
       expect(result.stats).toBeDefined();
@@ -61,7 +61,7 @@ describe('Performance IPC Handlers Integration', () => {
 
     test('should format pressure as percentage', async () => {
       const handler = mockHandlers.get('perf:get-memory-stats');
-      const result = await handler();
+      const result = await handler!();
 
       expect(result.stats.pressurePercent).toBeDefined();
       expect(result.stats.pressurePercent).toMatch(/^\d+\.\d%$/);
@@ -69,7 +69,7 @@ describe('Performance IPC Handlers Integration', () => {
 
     test('should include timestamp', async () => {
       const handler = mockHandlers.get('perf:get-memory-stats');
-      const result = await handler();
+      const result = await handler!();
 
       expect(result.stats.timestamp).toBeDefined();
       expect(typeof result.stats.timestamp).toBe('number');
@@ -91,7 +91,7 @@ describe('Performance IPC Handlers Integration', () => {
       }
 
       const handler = mockHandlers.get('perf:get-memory-trend');
-      const result = await handler();
+      const result = await handler!();
 
       expect(result.success).toBe(true);
       expect(result.trend).toBeDefined();
@@ -107,7 +107,7 @@ describe('Performance IPC Handlers Integration', () => {
       }
 
       const handler = mockHandlers.get('perf:get-memory-trend');
-      const result = await handler();
+      const result = await handler!();
 
       const validTrends = ['stable', 'increasing', 'decreasing'];
       expect(validTrends).toContain(result.trend.trend);
@@ -119,7 +119,7 @@ describe('Performance IPC Handlers Integration', () => {
       }
 
       const handler = mockHandlers.get('perf:get-memory-trend');
-      const result = await handler();
+      const result = await handler!();
 
       expect(result.trend.averagePressure).toMatch(/^\d+\.\d%$/);
       expect(result.trend.peakPressure).toMatch(/^\d+\.\d%$/);
@@ -136,7 +136,7 @@ describe('Performance IPC Handlers Integration', () => {
 
     test('should trigger normal cleanup', async () => {
       const handler = mockHandlers.get('perf:trigger-cleanup');
-      const result = await handler(null, false);
+      const result = await handler!(null, false);
 
       expect(result.success).toBe(true);
       expect(result.report).toBeDefined();
@@ -146,7 +146,7 @@ describe('Performance IPC Handlers Integration', () => {
 
     test('should trigger critical cleanup', async () => {
       const handler = mockHandlers.get('perf:trigger-cleanup');
-      const result = await handler(null, true);
+      const result = await handler!(null, true);
 
       expect(result.success).toBe(true);
       expect(result.report).toBeDefined();
@@ -155,7 +155,7 @@ describe('Performance IPC Handlers Integration', () => {
 
     test('should handle missing isCritical parameter', async () => {
       const handler = mockHandlers.get('perf:trigger-cleanup');
-      const result = await handler(null);
+      const result = await handler!(null);
 
       expect(result.success).toBe(true);
       expect(result.report).toBeDefined();
@@ -163,7 +163,7 @@ describe('Performance IPC Handlers Integration', () => {
 
     test('should include cleanup metrics in report', async () => {
       const handler = mockHandlers.get('perf:trigger-cleanup');
-      const result = await handler(null, false);
+      const result = await handler!(null, false);
 
       expect(result.report.contextsCleanup).toBeGreaterThanOrEqual(0);
       expect(result.report.cacheCleanup).toBeGreaterThanOrEqual(0);
@@ -185,7 +185,7 @@ describe('Performance IPC Handlers Integration', () => {
       await screenshotCache.getOrCache(buffer);
 
       const handler = mockHandlers.get('perf:get-screenshot-cache-stats');
-      const result = await handler();
+      const result = await handler!();
 
       expect(result.success).toBe(true);
       expect(result.stats).toBeDefined();
@@ -197,7 +197,7 @@ describe('Performance IPC Handlers Integration', () => {
 
     test('should format compression ratio as percentage', async () => {
       const handler = mockHandlers.get('perf:get-screenshot-cache-stats');
-      const result = await handler();
+      const result = await handler!();
 
       expect(result.stats.compressionRatio).toMatch(/^\d+\.\d%$/);
       expect(result.stats.hitRate).toMatch(/^\d+\.\d%$/);
@@ -205,7 +205,7 @@ describe('Performance IPC Handlers Integration', () => {
 
     test('should track hit and miss counts', async () => {
       const handler = mockHandlers.get('perf:get-screenshot-cache-stats');
-      const result = await handler();
+      const result = await handler!();
 
       expect(result.stats.hits).toBeGreaterThanOrEqual(0);
       expect(result.stats.misses).toBeGreaterThanOrEqual(0);
@@ -225,7 +225,7 @@ describe('Performance IPC Handlers Integration', () => {
       await screenshotCache.getOrCache(buffer);
 
       const handler = mockHandlers.get('perf:clear-screenshot-cache');
-      const result = await handler();
+      const result = await handler!();
 
       expect(result.success).toBe(true);
       expect(result.message).toContain('cleared');
@@ -233,7 +233,7 @@ describe('Performance IPC Handlers Integration', () => {
 
     test('should handle clearing empty cache', async () => {
       const handler = mockHandlers.get('perf:clear-screenshot-cache');
-      const result = await handler();
+      const result = await handler!();
 
       expect(result.success).toBe(true);
     });
@@ -249,7 +249,7 @@ describe('Performance IPC Handlers Integration', () => {
 
     test('should retrieve model cache statistics', async () => {
       const handler = mockHandlers.get('perf:get-model-cache-stats');
-      const result = await handler();
+      const result = await handler!();
 
       expect(result.success).toBe(true);
       expect(result.stats).toBeDefined();
@@ -262,7 +262,7 @@ describe('Performance IPC Handlers Integration', () => {
 
     test('should return provider list', async () => {
       const handler = mockHandlers.get('perf:get-model-cache-stats');
-      const result = await handler();
+      const result = await handler!();
 
       expect(Array.isArray(result.stats.cachedProviders)).toBe(true);
     });
@@ -278,7 +278,7 @@ describe('Performance IPC Handlers Integration', () => {
 
     test('should initialize model cache', async () => {
       const handler = mockHandlers.get('perf:initialize-model-cache');
-      const result = await handler();
+      const result = await handler!();
 
       expect(result.success).toBe(true);
       expect(result.providers).toBeDefined();
@@ -287,7 +287,7 @@ describe('Performance IPC Handlers Integration', () => {
 
     test('should pre-populate known providers', async () => {
       const handler = mockHandlers.get('perf:initialize-model-cache');
-      const result = await handler();
+      const result = await handler!();
 
       expect(result.providers.length).toBeGreaterThan(0);
     });
@@ -303,7 +303,7 @@ describe('Performance IPC Handlers Integration', () => {
 
     test('should clear all model cache', async () => {
       const handler = mockHandlers.get('perf:clear-model-cache');
-      const result = await handler(null);
+      const result = await handler!(null);
 
       expect(result.success).toBe(true);
       expect(result.message).toContain('cleared');
@@ -311,7 +311,7 @@ describe('Performance IPC Handlers Integration', () => {
 
     test('should clear specific provider cache', async () => {
       const handler = mockHandlers.get('perf:clear-model-cache');
-      const result = await handler(null, 'deepseek');
+      const result = await handler!(null, 'deepseek');
 
       expect(result.success).toBe(true);
     });
@@ -319,10 +319,10 @@ describe('Performance IPC Handlers Integration', () => {
     test('should handle provider parameter', async () => {
       const handler = mockHandlers.get('perf:clear-model-cache');
 
-      const resultAll = await handler(null);
+      const resultAll = await handler!(null);
       expect(resultAll.success).toBe(true);
 
-      const resultSpecific = await handler(null, 'qwen');
+      const resultSpecific = await handler!(null, 'qwen');
       expect(resultSpecific.success).toBe(true);
     });
   });
@@ -341,7 +341,7 @@ describe('Performance IPC Handlers Integration', () => {
       }
 
       const handler = mockHandlers.get('perf:get-memory-history');
-      const result = await handler(null, 10);
+      const result = await handler!(null, 10);
 
       expect(result.success).toBe(true);
       expect(Array.isArray(result.history)).toBe(true);
@@ -354,7 +354,7 @@ describe('Performance IPC Handlers Integration', () => {
       }
 
       const handler = mockHandlers.get('perf:get-memory-history');
-      const result = await handler(null, 3);
+      const result = await handler!(null, 3);
 
       expect(result.history.length).toBeLessThanOrEqual(3);
     });
@@ -365,7 +365,7 @@ describe('Performance IPC Handlers Integration', () => {
       }
 
       const handler = mockHandlers.get('perf:get-memory-history');
-      const result = await handler(null);
+      const result = await handler!(null);
 
       expect(result.success).toBe(true);
       expect(Array.isArray(result.history)).toBe(true);
@@ -375,7 +375,7 @@ describe('Performance IPC Handlers Integration', () => {
       memoryManager.getMemoryStats();
 
       const handler = mockHandlers.get('perf:get-memory-history');
-      const result = await handler(null, 1);
+      const result = await handler!(null, 1);
 
       if (result.history.length > 0) {
         expect(result.history[0].pressure).toMatch(/^\d+\.\d%$/);
@@ -395,7 +395,7 @@ describe('Performance IPC Handlers Integration', () => {
 
     test('should generate comprehensive performance report', async () => {
       const handler = mockHandlers.get('perf:get-performance-report');
-      const result = await handler();
+      const result = await handler!();
 
       expect(result.success).toBe(true);
       expect(result.report).toBeDefined();
@@ -407,7 +407,7 @@ describe('Performance IPC Handlers Integration', () => {
 
     test('should include memory metrics in report', async () => {
       const handler = mockHandlers.get('perf:get-performance-report');
-      const result = await handler();
+      const result = await handler!();
 
       expect(result.report.memory.current).toBeDefined();
       expect(result.report.memory.trend).toBeDefined();
@@ -416,7 +416,7 @@ describe('Performance IPC Handlers Integration', () => {
 
     test('should include screenshot metrics in report', async () => {
       const handler = mockHandlers.get('perf:get-performance-report');
-      const result = await handler();
+      const result = await handler!();
 
       expect(result.report.screenshot.cached).toBeGreaterThanOrEqual(0);
       expect(result.report.screenshot.totalSize).toBeGreaterThanOrEqual(0);
@@ -426,7 +426,7 @@ describe('Performance IPC Handlers Integration', () => {
 
     test('should include model cache metrics in report', async () => {
       const handler = mockHandlers.get('perf:get-performance-report');
-      const result = await handler();
+      const result = await handler!();
 
       expect(result.report.models.providers).toBeDefined();
       expect(Array.isArray(result.report.models.providers)).toBe(true);
@@ -472,7 +472,7 @@ describe('Performance IPC Handlers Integration', () => {
 
       for (const { channel, args } of handlers) {
         const handler = mockHandlers.get(channel);
-        const result = await handler(...args);
+        const result = await handler!(...args);
         expect(result.success).toBe(true);
       }
     });
@@ -486,7 +486,7 @@ describe('Performance IPC Handlers Integration', () => {
 
       for (const { channel, args } of handlers) {
         const handler = mockHandlers.get(channel);
-        const result = await handler(...args);
+        const result = await handler!(...args);
         // Even if there's an error, it should be handled gracefully
         expect(result).toHaveProperty('success');
       }
@@ -499,7 +499,7 @@ describe('Performance IPC Handlers Integration', () => {
 
       const promises = Array(5)
         .fill(null)
-        .map(() => handler());
+        .map(() => handler!());
 
       const results = await Promise.all(promises);
 
@@ -514,7 +514,7 @@ describe('Performance IPC Handlers Integration', () => {
 
       const promises = Array(5)
         .fill(null)
-        .map(() => handler());
+        .map(() => handler!());
 
       const results = await Promise.all(promises);
 
@@ -533,7 +533,7 @@ describe('Performance IPC Handlers Integration', () => {
 
       const promises = Array(5)
         .fill(null)
-        .map(() => handler(null, 10));
+        .map(() => handler!(null, 10));
 
       const results = await Promise.all(promises);
 
@@ -548,8 +548,8 @@ describe('Performance IPC Handlers Integration', () => {
     test('memory stats should be consistent across calls', async () => {
       const handler = mockHandlers.get('perf:get-memory-stats');
 
-      const result1 = await handler();
-      const result2 = await handler();
+      const result1 = await handler!();
+      const result2 = await handler!();
 
       expect(result1.stats.heapLimit).toBe(result2.stats.heapLimit);
       expect(result1.stats.heapTotal).toBeGreaterThanOrEqual(0);
@@ -558,7 +558,7 @@ describe('Performance IPC Handlers Integration', () => {
 
     test('performance report should include all components', async () => {
       const handler = mockHandlers.get('perf:get-performance-report');
-      const result = await handler();
+      const result = await handler!();
 
       // Verify all required sections
       expect(result.report).toHaveProperty('memory');

@@ -40,7 +40,8 @@ export const StickyInputBox: React.FC<StickyInputBoxProps> = ({
     // Get actual File objects from upload files
     const attachments = fileList
       .map((file) => file.originFileObj)
-      .filter((file): file is File => file !== undefined);
+      .filter((file): file is Exclude<typeof file, undefined> => file !== undefined)
+      .map((file) => new File([file], file.name, { type: file.type }));
 
     if (onSendMessage) {
       onSendMessage(trimmedValue, attachments);

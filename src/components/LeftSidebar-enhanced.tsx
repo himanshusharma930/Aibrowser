@@ -73,7 +73,7 @@ export const EnhancedLeftSidebar: React.FC<EnhancedLeftSidebarProps> = ({
         // Set active tab (most recently accessed)
         if (loadedTabs.length > 0) {
           const mostRecent = loadedTabs.reduce((prev, current) =>
-            current.lastAccessedAt > prev.lastAccessedAt ? current : prev
+            (current.lastAccessedAt ?? 0) > (prev.lastAccessedAt ?? 0) ? current : prev
           );
           setActiveTabId(mostRecent.id);
         }
@@ -109,7 +109,7 @@ export const EnhancedLeftSidebar: React.FC<EnhancedLeftSidebarProps> = ({
     // Update last accessed time
     const tab = tabs.find((t) => t.id === tabId);
     if (tab) {
-      tab.lastAccessedAt = new Date();
+      tab.lastAccessedAt = Date.now();
       await tabsStorage.save(tab);
       setTabs([...tabs]);
 
@@ -134,7 +134,7 @@ export const EnhancedLeftSidebar: React.FC<EnhancedLeftSidebarProps> = ({
 
     // Update active workspace tab list
     if (activeWorkspace) {
-      activeWorkspace.tabIds = activeWorkspace.tabIds.filter((id) => id !== tabId);
+      activeWorkspace.tabIds = (activeWorkspace.tabIds ?? []).filter((id) => id !== tabId);
       await workspacesStorage.save(activeWorkspace);
     }
 
@@ -195,8 +195,8 @@ export const EnhancedLeftSidebar: React.FC<EnhancedLeftSidebarProps> = ({
       url: '',
       isPinned: false,
       workspaceId: activeWorkspace?.id,
-      createdAt: new Date(),
-      lastAccessedAt: new Date()
+      createdAt: Date.now(),
+      lastAccessedAt: Date.now()
     };
 
     await tabsStorage.save(newTab);
@@ -204,6 +204,9 @@ export const EnhancedLeftSidebar: React.FC<EnhancedLeftSidebarProps> = ({
 
     // Add to active workspace
     if (activeWorkspace) {
+      if (!activeWorkspace.tabIds) {
+        activeWorkspace.tabIds = [];
+      }
       activeWorkspace.tabIds.push(newTab.id);
       await workspacesStorage.save(activeWorkspace);
     }
@@ -231,7 +234,7 @@ export const EnhancedLeftSidebar: React.FC<EnhancedLeftSidebarProps> = ({
     const newWorkspace = workspaces.find((w) => w.id === workspaceId);
     if (newWorkspace) {
       newWorkspace.isActive = true;
-      newWorkspace.lastAccessedAt = new Date();
+      newWorkspace.lastAccessedAt = Date.now();
       await workspacesStorage.save(newWorkspace);
       setActiveWorkspace(newWorkspace);
 
@@ -255,8 +258,8 @@ export const EnhancedLeftSidebar: React.FC<EnhancedLeftSidebarProps> = ({
       favicon: favorite.favicon,
       isPinned: false,
       workspaceId: activeWorkspace?.id,
-      createdAt: new Date(),
-      lastAccessedAt: new Date()
+      createdAt: Date.now(),
+      lastAccessedAt: Date.now()
     };
 
     await tabsStorage.save(newTab);
@@ -264,6 +267,9 @@ export const EnhancedLeftSidebar: React.FC<EnhancedLeftSidebarProps> = ({
 
     // Add to active workspace
     if (activeWorkspace) {
+      if (!activeWorkspace.tabIds) {
+        activeWorkspace.tabIds = [];
+      }
       activeWorkspace.tabIds.push(newTab.id);
       await workspacesStorage.save(activeWorkspace);
     }

@@ -38,7 +38,7 @@ export const ResizeHandle: React.FC<ResizeHandleProps> = ({ side, className }) =
       setIsDragging(true);
       setPanelDragging(true);
       startXRef.current = e.clientX;
-      startWidthRef.current = panelState.width;
+      startWidthRef.current = panelState.width ?? 0;
 
       // Add cursor style to body
       document.body.style.cursor = 'ew-resize';
@@ -106,11 +106,11 @@ export const ResizeHandle: React.FC<ResizeHandleProps> = ({ side, className }) =
         // Keyboard resize support
         if (e.key === 'ArrowLeft') {
           e.preventDefault();
-          const newWidth = side === 'left' ? panelState.width - 10 : panelState.width + 10;
+          const newWidth = side === 'left' ? (panelState.width ?? 0) - 10 : (panelState.width ?? 0) + 10;
           setPanelWidth(newWidth);
         } else if (e.key === 'ArrowRight') {
           e.preventDefault();
-          const newWidth = side === 'left' ? panelState.width + 10 : panelState.width - 10;
+          const newWidth = side === 'left' ? (panelState.width ?? 0) + 10 : (panelState.width ?? 0) - 10;
           setPanelWidth(newWidth);
         }
       }}

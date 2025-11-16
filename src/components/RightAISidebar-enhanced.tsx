@@ -82,10 +82,7 @@ export const EnhancedRightAISidebar: React.FC<EnhancedRightAISidebarProps> = ({
     <div className={`${styles.rightAISidebar} ${className || ''}`}>
       {/* Sticky Header - Stays visible on scroll */}
       <div className={styles.sidebarHeader}>
-        <AISidebarHeader
-          onClear={onClear}
-          onMinimize={onMinimize}
-        />
+        <AISidebarHeader />
       </div>
 
       {/* Main scrollable wrapper containing conversation and input */}

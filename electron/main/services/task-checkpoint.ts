@@ -272,6 +272,59 @@ export class TaskCheckpointManager {
   }
 
   /**
+   * Associate an existing checkpoint with a new task ID (real Eko task ID)
+   */
+  async associateCheckpointWithTaskId(oldTaskId: string, newTaskId: string): Promise<void> {
+    if (!oldTaskId || !newTaskId || oldTaskId === newTaskId) {
+      return;
+    }
+
+    const checkpoint = this.checkpoints.get(oldTaskId);
+    if (!checkpoint) {
+      // Attempt to load from disk in case it was evicted from the cache
+      const loaded = await this.loadCheckpoint(oldTaskId);
+      if (!loaded) {
+        this.logger.warn('Cannot associate checkpoint: source checkpoint not found', {
+          oldTaskId,
+          newTaskId
+        });
+        return;
+      }
+      this.checkpoints.set(oldTaskId, loaded);
+    }
+
+    const updatedCheckpoint = this.checkpoints.get(oldTaskId);
+    if (!updatedCheckpoint) {
+      return;
+    }
+
+    const oldPath = path.join(this.checkpointDir, `${oldTaskId}.json`);
+    updatedCheckpoint.taskId = newTaskId;
+
+    // Update cache keys
+    this.checkpoints.delete(oldTaskId);
+    this.checkpoints.set(newTaskId, updatedCheckpoint);
+
+    try {
+      await fs.rm(oldPath, { force: true });
+    } catch (error) {
+      this.logger.warn('Failed to delete old checkpoint file during association', {
+        oldTaskId,
+        newTaskId,
+        error: (error as Error).message
+      });
+    }
+
+    await this.persistCheckpoint(updatedCheckpoint);
+
+    this.logger.info('Checkpoint task ID associated with real task ID', {
+      oldTaskId,
+      newTaskId,
+      checkpointId: updatedCheckpoint.id
+    });
+  }
+
+  /**
    * Mark checkpoint as paused (preserves state for later resume)
    */
   async pauseCheckpoint(taskId: string): Promise<void> {
@@ -362,7 +415,7 @@ export class TaskCheckpointManager {
       this.logger.info('Checkpoint deleted', { taskId, path: filePath });
     } catch (error) {
       // ✅ PHASE 2: Use logger for deletion error
-      this.logger.warn(
+      this.logger.error(
         'Failed to delete checkpoint file',
         error as Error,
         { taskId },

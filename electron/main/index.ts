@@ -118,13 +118,24 @@ console.log("main: isDev:", isDev);
 console.log("NODE_ENV:", global.process.env.NODE_ENV);
 console.log("isPackaged:", app.isPackaged);
 
-// Log unhandled errors
+// Log and handle unhandled errors
 process.on("uncaughtException", async (error) => {
-  console.log("Uncaught Exception:", error);
+  console.error("Uncaught Exception:", error);
+  // Show error dialog to user
+  if (app.isReady()) {
+    dialog.showErrorBox(
+      'Application Error',
+      `An unexpected error occurred: ${error.message}\n\nThe application will continue running, but some features may not work correctly.`
+    );
+  }
 });
 
 process.on("unhandledRejection", async (error) => {
-  console.log("Unhandled Rejection:", error);
+  console.error("Unhandled Rejection:", error);
+  // Log for debugging but don't crash the app
+  if (app.isReady() && error instanceof Error) {
+    console.error('Stack trace:', error.stack);
+  }
 });
 
 (() => {
@@ -169,7 +180,7 @@ protocol.registerSchemesAsPrivileged([
       secure: true,
       supportFetchAPI: true,
       corsEnabled: true,
-      bypassCSP: true
+      bypassCSP: false  // Security: Never bypass CSP
     }
   }
 ]);

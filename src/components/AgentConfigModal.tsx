@@ -232,7 +232,7 @@ export default function AgentConfigModal({ visible, onClose }: AgentConfigModalP
                 <div style={{ marginBottom: '12px' }}>
                   <Text strong style={{ display: 'block', marginBottom: '6px' }}>Custom System Prompt</Text>
                   <Text type="secondary" style={{ fontSize: '13px' }}>
-                    Add custom instructions to extend the File Agent's capabilities.
+                    Add custom instructions to extend the File Agent&apos;s capabilities.
                   </Text>
                 </div>
 

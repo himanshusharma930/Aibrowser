@@ -241,13 +241,7 @@ export class ScreenshotCacheManager {
         path: filePath
       });
     } catch (error: any) {
-      logger.warn(
-        'Failed to persist screenshot to disk',
-        { error: error.message },
-        ErrorCategory.FILE_SYSTEM,
-        ErrorSeverity.LOW,
-        false
-      );
+      logger.warn('Failed to persist screenshot to disk', { error: error.message });
     }
   }
 

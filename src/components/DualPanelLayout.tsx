@@ -61,8 +61,8 @@ export const DualPanelLayout: React.FC<DualPanelLayoutProps> = ({
         }
 
         // Restore saved layout state
-        if (typeof window !== 'undefined' && window.api?.layout?.getPanelState) {
-          const savedState = await window.api.layout.getPanelState();
+        if (typeof window !== 'undefined' && window.api?.layout?.loadPanelState) {
+          const savedState = await window.api.layout.loadPanelState();
           if (savedState) {
             restoreState(savedState);
           }

@@ -8,6 +8,14 @@
 import { ipcMain } from 'electron';
 import { store } from '../utils/store';
 import type { LayoutState, BrowserTabState, Workspace, Favorite, BrowserPreviewBounds } from '../../../src/type';
+import { z } from 'zod';
+// ✅ SECURITY FIX: Import validation middleware and schemas
+import { validateIpc, validateIpcArgs } from './validation-middleware';
+import {
+  UpdateDetailViewBoundsSchema,
+  SetDetailViewVisibleSchema,
+  NavigateToSchema
+} from '../../../src/types/ipc-contracts';
 
 // Storage keys
 const LAYOUT_STATE_KEY = 'layout.panelState';
@@ -119,23 +127,58 @@ export function registerLayoutHandlers() {
     }
   });
 
-  // Save panel state
-  ipcMain.handle('layout:save-panel-state', async (event, state: LayoutState) => {
-    try {
-      if (!validateLayoutState(state)) {
-        throw new Error('Invalid layout state provided');
+  // Save panel state - ✅ VALIDATED
+  ipcMain.handle('layout:save-panel-state',
+    validateIpc(z.object({
+      leftPanel: z.object({
+        isExpanded: z.boolean(),
+        width: z.number(),
+        isDragging: z.boolean(),
+        minWidth: z.number(),
+        maxWidth: z.number(),
+        collapsedWidth: z.number()
+      }),
+      rightPanel: z.object({
+        isExpanded: z.boolean(),
+        width: z.number(),
+        isDragging: z.boolean(),
+        minWidth: z.number(),
+        maxWidth: z.number(),
+        collapsedWidth: z.number()
+      }),
+      browserPreview: z.object({
+        x: z.number(),
+        y: z.number(),
+        width: z.number(),
+        height: z.number(),
+        marginLeft: z.number(),
+        marginRight: z.number()
+      }),
+      currentStage: z.number(),
+      navigationBarHeight: z.number(),
+      windowWidth: z.number(),
+      windowHeight: z.number(),
+      animationDuration: z.number(),
+      isTransitioning: z.boolean()
+    }))(
+      async (event, state: LayoutState) => {
+        try {
+          if (!validateLayoutState(state)) {
+            throw new Error('Invalid layout state provided');
+          }
+
+          store.set(LAYOUT_STATE_KEY, state);
+          store.set(LAYOUT_VERSION_KEY, CURRENT_VERSION);
+
+          console.log('[IPC] Layout state saved successfully');
+          return { success: true };
+        } catch (error) {
+          console.error('[IPC] Failed to save layout state:', error);
+          return { success: false, error: String(error) };
+        }
       }
-
-      store.set(LAYOUT_STATE_KEY, state);
-      store.set(LAYOUT_VERSION_KEY, CURRENT_VERSION);
-
-      console.log('[IPC] Layout state saved successfully');
-      return { success: true };
-    } catch (error) {
-      console.error('[IPC] Failed to save layout state:', error);
-      return { success: false, error: String(error) };
-    }
-  });
+    )
+  );
 
   // Get tabs state
   ipcMain.handle('layout:get-tabs-state', async (event) => {
@@ -155,17 +198,33 @@ export function registerLayoutHandlers() {
     }
   });
 
-  // Save tabs state
-  ipcMain.handle('layout:save-tabs-state', async (event, state: BrowserTabState) => {
-    try {
-      store.set(TABS_STATE_KEY, state);
-      console.log('[IPC] Tabs state saved successfully');
-      return { success: true };
-    } catch (error) {
-      console.error('[IPC] Failed to save tabs state:', error);
-      return { success: false, error: String(error) };
-    }
-  });
+  // Save tabs state - ✅ VALIDATED
+  ipcMain.handle('layout:save-tabs-state',
+    validateIpc(z.object({
+      tabs: z.array(z.object({
+        id: z.string(),
+        url: z.string(),
+        title: z.string(),
+        favicon: z.string().optional(),
+        isLoading: z.boolean(),
+        canGoBack: z.boolean(),
+        canGoForward: z.boolean()
+      })),
+      activeTabId: z.string(),
+      tabHistory: z.array(z.string())
+    }))(
+      async (event, state: BrowserTabState) => {
+        try {
+          store.set(TABS_STATE_KEY, state);
+          console.log('[IPC] Tabs state saved successfully');
+          return { success: true };
+        } catch (error) {
+          console.error('[IPC] Failed to save tabs state:', error);
+          return { success: false, error: String(error) };
+        }
+      }
+    )
+  );
 
   // Get workspaces
   ipcMain.handle('layout:get-workspaces', async (event) => {
@@ -179,17 +238,29 @@ export function registerLayoutHandlers() {
     }
   });
 
-  // Save workspaces
-  ipcMain.handle('layout:save-workspaces', async (event, workspaces: Workspace[]) => {
-    try {
-      store.set(WORKSPACES_KEY, workspaces);
-      console.log('[IPC] Workspaces saved successfully');
-      return { success: true };
-    } catch (error) {
-      console.error('[IPC] Failed to save workspaces:', error);
-      return { success: false, error: String(error) };
-    }
-  });
+  // Save workspaces - ✅ VALIDATED
+  ipcMain.handle('layout:save-workspaces',
+    validateIpc(z.object({
+      workspaces: z.array(z.object({
+        id: z.string(),
+        name: z.string(),
+        url: z.string(),
+        timestamp: z.number(),
+        isActive: z.boolean()
+      }))
+    }))(
+      async (event, data: { workspaces: Workspace[] }) => {
+        try {
+          store.set(WORKSPACES_KEY, data.workspaces);
+          console.log('[IPC] Workspaces saved successfully');
+          return { success: true };
+        } catch (error) {
+          console.error('[IPC] Failed to save workspaces:', error);
+          return { success: false, error: String(error) };
+        }
+      }
+    )
+  );
 
   // Get favorites
   ipcMain.handle('layout:get-favorites', async (event) => {
@@ -203,17 +274,29 @@ export function registerLayoutHandlers() {
     }
   });
 
-  // Save favorites
-  ipcMain.handle('layout:save-favorites', async (event, favorites: Favorite[]) => {
-    try {
-      store.set(FAVORITES_KEY, favorites);
-      console.log('[IPC] Favorites saved successfully');
-      return { success: true };
-    } catch (error) {
-      console.error('[IPC] Failed to save favorites:', error);
-      return { success: false, error: String(error) };
-    }
-  });
+  // Save favorites - ✅ VALIDATED
+  ipcMain.handle('layout:save-favorites',
+    validateIpc(z.object({
+      favorites: z.array(z.object({
+        id: z.string(),
+        name: z.string(),
+        url: z.string(),
+        tags: z.array(z.string()),
+        timestamp: z.number()
+      }))
+    }))(
+      async (event, data: { favorites: Favorite[] }) => {
+        try {
+          store.set(FAVORITES_KEY, data.favorites);
+          console.log('[IPC] Favorites saved successfully');
+          return { success: true };
+        } catch (error) {
+          console.error('[IPC] Failed to save favorites:', error);
+          return { success: false, error: String(error) };
+        }
+      }
+    )
+  );
 
   console.log('[IPC] Layout handlers registered successfully');
 }

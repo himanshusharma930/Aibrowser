@@ -1,0 +1,12 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Run type check
+echo "Running TypeScript type check..."
+pnpm tsc --noEmit || exit 1
+
+# Run linter
+echo "Running ESLint..."
+pnpm lint || exit 1
+
+echo "Pre-commit checks passed!"

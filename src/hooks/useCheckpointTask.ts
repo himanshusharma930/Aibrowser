@@ -64,8 +64,8 @@ export function useCheckpointTask() {
     ) => {
       try {
         // Check if resuming from checkpoint
-        const existingCheckpoint = await window.api.ekoCheckpointStatus(taskState.taskId || '');
-        if (existingCheckpoint?.status && ['paused', 'failed'].includes(existingCheckpoint.status)) {
+        const existingCheckpoint = await window.api.eko.ekoCheckpointStatus(taskState.taskId || '');
+        if (existingCheckpoint?.status && ['paused', 'failed'].includes(existingCheckpoint.status.status as string)) {
           const shouldResume = await new Promise(resolve => {
             // In real app, show UI dialog
             resolve(confirm(`Resume previous task? Progress: ${existingCheckpoint.summary?.progress?.toFixed(0)}%`));
@@ -84,7 +84,7 @@ export function useCheckpointTask() {
         }));
 
         // Request checkpoint-aware execution
-        const result = await window.api.ekoRunCheckpoint(prompt, {
+        const result = await window.api.eko.ekoRunCheckpoint(prompt, {
           checkpointInterval: options?.checkpointInterval || 10,
           agents: options?.agents,
         });
@@ -109,7 +109,7 @@ export function useCheckpointTask() {
           } else if (message.type === 'checkpoint_saved') {
             setTaskState(s => ({
               ...s,
-              checkpointId: message.checkpointId,
+              checkpointId: message.checkpointId || null,
               progress: Math.min(s.progress + 5, 95),
               canResume: true,
             }));
@@ -117,7 +117,7 @@ export function useCheckpointTask() {
             setTaskState(s => ({
               ...s,
               status: 'failed',
-              error: message.message || 'Task failed',
+              error: message.message || null,
               canResume: true, // Can resume after error
             }));
           } else if (message.type === 'completed') {
@@ -156,7 +156,7 @@ export function useCheckpointTask() {
     if (!taskState.taskId) return;
 
     try {
-      const result = await window.api.ekoPauseTask(taskState.taskId);
+      const result = await window.api.eko.ekoPauseTask(taskState.taskId);
       setTaskState(s => ({
         ...s,
         status: 'paused',
@@ -165,12 +165,12 @@ export function useCheckpointTask() {
       }));
 
       // Get checkpoint info for UI
-      const status = await window.api.ekoCheckpointStatus(taskState.taskId);
-      if (status?.summary) {
+      const status = await window.api.eko.ekoCheckpointStatus(taskState.taskId);
+      if (status?.summary !== null && status?.summary !== undefined) {
         setTaskState(s => ({
           ...s,
-          progress: status.summary.progress,
-          estimatedTokensSaved: status.summary.estimatedTokensSaved,
+          progress: status.summary!.progress,
+          estimatedTokensSaved: status.summary!.estimatedTokensSaved,
         }));
       }
     } catch (error: any) {
@@ -193,11 +193,11 @@ export function useCheckpointTask() {
         currentMessage: 'Resuming task from checkpoint...',
       }));
 
-      const result = await window.api.ekoResumeTask(taskId);
+      const result = await window.api.eko.ekoResumeTask(taskId);
 
       // Listen to stream events again
-      if (window.api?.onEkoStreamMessage) {
-        window.api.onEkoStreamMessage((event: any, message: StreamMessage) => {
+      if (window.api?.eko?.onEkoStreamMessage) {
+        window.api.eko.onEkoStreamMessage((event: any, message: StreamMessage) => {
           if (message.type === 'completed') {
             setTaskState(s => ({
               ...s,
@@ -208,13 +208,18 @@ export function useCheckpointTask() {
             setTaskState(s => ({
               ...s,
               status: 'failed',
-              error: message.message,
+              error: message.message || null,
             }));
           }
         });
       }
 
-      await result.promise;
+      try {
+        await result.promise;
+      } finally {
+        // Listener cleanup not supported by current API
+        // onEkoStreamMessage doesn't return cleanup function
+      }
     } catch (error: any) {
       setTaskState(s => ({
         ...s,
@@ -229,7 +234,7 @@ export function useCheckpointTask() {
    */
   const listCheckpoints = useCallback(async () => {
     try {
-      const checkpoints = await window.api.ekoListCheckpoints();
+      const checkpoints = await window.api.eko.ekoListCheckpoints();
       setCheckpoints(checkpoints);
       return checkpoints;
     } catch (error: any) {
@@ -243,7 +248,7 @@ export function useCheckpointTask() {
    */
   const deleteCheckpoint = useCallback(async (taskId: string) => {
     try {
-      await window.api.ekoDeleteCheckpoint(taskId);
+      await window.api.eko.ekoDeleteCheckpoint(taskId);
       setCheckpoints(cp => cp.filter(c => c.taskId !== taskId));
     } catch (error: any) {
       console.error('Failed to delete checkpoint:', error);

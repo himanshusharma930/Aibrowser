@@ -48,6 +48,10 @@ export { browserPinchZoomTool } from './browser-pinch-zoom';
 export { browserKeyboardMouseComboTool } from './browser-keyboard-mouse-combo';
 export { browserScrollHorizontalTool } from './browser-scroll-horizontal';
 
+// Phase 6 tools - Additional Utilities
+export { browserGetClickableElementsTool } from './browser-get-clickable-elements';
+export { browserWebSearchTool } from './browser-web-search';
+
 // Shared utilities
 export * from './shared/error-codes';
 export * from './shared/types';

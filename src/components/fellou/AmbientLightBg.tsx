@@ -21,7 +21,6 @@ export function AnimatedBackground({
   speed = 0.25,
 }: AnimatedBackgroundProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const colorBgRef = useRef<any>(null);
 
   useEffect(() => {
@@ -105,7 +104,6 @@ export function AnimatedBackground({
 // 添加全局类型声明
 declare global {
   interface Window {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     AmbientLightBg?: any;
   }
 }

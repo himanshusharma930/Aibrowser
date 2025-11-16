@@ -1,14 +1,25 @@
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
+import dynamic from 'next/dynamic'
 import AISidebarHeader from '@/components/AISidebarHeader'
 import { Input } from 'antd'
-import { ScheduledTaskModal, ScheduledTaskListPanel } from '@/components/scheduled-task'
 import { useScheduledTaskStore } from '@/stores/scheduled-task-store'
 import { ModelConfigBar } from '@/components/ModelConfigBar'
 import { ChromeBrowserBackground } from '@/components/fellou/ChromeBrowserBackground'
 import { useTranslation } from 'react-i18next'
 import { FIRST_MESSAGE_KEY } from '@/hooks/useLayoutMode'
 import { optimizedFullWidthLayoutTransition } from '@/utils/layout-transition'
+
+// ✅ CODE SPLITTING: Lazy load scheduled task components (only used in home page)
+const ScheduledTaskModal = dynamic(
+  () => import('@/components/scheduled-task').then(mod => ({ default: mod.ScheduledTaskModal })),
+  { ssr: false, loading: () => null }
+);
+
+const ScheduledTaskListPanel = dynamic(
+  () => import('@/components/scheduled-task').then(mod => ({ default: mod.ScheduledTaskListPanel })),
+  { ssr: false, loading: () => null }
+);
 
 export default function Home() {
     const [query, setQuery] = useState('')

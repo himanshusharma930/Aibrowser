@@ -6,7 +6,7 @@ export interface ToolAction {
   toolName: string;
   type: 'tool';
   params?: any;
-  status: 'streaming' | 'use' | 'running' | 'completed';
+  status: 'streaming' | 'use' | 'running' | 'completed' | 'error';
   result?: any;
   timestamp: Date;
   agentName: string;

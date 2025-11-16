@@ -49,7 +49,7 @@ export const browserGetClickableElementsTool: Tool = {
     try {
       const includeHidden = args.includeHidden === true;
 
-      const elements: ClickableElement[] = await (agentContext.agent as any).execute_script(agentContext, 
+      const elements: ClickableElement[] = await agentContext.agent.execute_script(
         agentContext,
         (includeHidden: boolean) => {
           const clickableSelectors = [

@@ -1,5 +1,12 @@
 import { ipcMain } from "electron";
 import { windowContextManager } from "../services/window-context-manager";
+// ✅ SECURITY FIX: Import validation middleware and schemas
+import { validateIpc, validateIpcArgs } from "./validation-middleware";
+import {
+  SetDetailViewVisibleBoolSchema,
+  UpdateDetailViewBoundsSchema,
+  NavigateToSchema
+} from "../../../src/types/ipc-contracts";
 
 /**
  * Validate and adjust detail view bounds to ensure they're within window constraints
@@ -97,23 +104,27 @@ export function registerViewHandlers() {
     };
   });
 
-  // Set detail view visibility
-  ipcMain.handle('set-detail-view-visible', async (event, visible: boolean) => {
-    try {
-      console.log('IPC set-detail-view-visible received:', visible);
-      const context = windowContextManager.getContext(event.sender.id);
-      if (!context || !context.detailView) {
-        throw new Error('DetailView not found for this window');
+  // Set detail view visibility - ✅ VALIDATED
+  ipcMain.handle('set-detail-view-visible',
+    validateIpcArgs([SetDetailViewVisibleBoolSchema])(
+      async (event, visible) => {
+        try {
+          console.log('IPC set-detail-view-visible received:', visible);
+          const context = windowContextManager.getContext(event.sender.id);
+          if (!context || !context.detailView) {
+            throw new Error('DetailView not found for this window');
+          }
+
+          context.detailView.setVisible(visible);
+
+          return { success: true, visible };
+        } catch (error: any) {
+          console.error('IPC set-detail-view-visible error:', error);
+          throw error;
+        }
       }
-
-      context.detailView.setVisible(visible);
-
-      return { success: true, visible };
-    } catch (error: any) {
-      console.error('IPC set-detail-view-visible error:', error);
-      throw error;
-    }
-  });
+    )
+  );
 
   // Get current URL from detail view
   ipcMain.handle('get-current-url', async (event) => {
@@ -130,54 +141,62 @@ export function registerViewHandlers() {
     }
   });
 
-  // Update detail view bounds for resizable panel coordination
-  ipcMain.handle('update-detail-view-bounds', async (event, bounds: { x: number; y: number; width: number; height: number }) => {
-    try {
-      console.log('IPC update-detail-view-bounds received:', bounds);
-      const context = windowContextManager.getContext(event.sender.id);
-      if (!context || !context.detailView || !context.window) {
-        console.warn('DetailView not found for bounds update');
-        return { success: false, error: 'DetailView not found' };
+  // Update detail view bounds for resizable panel coordination - ✅ VALIDATED
+  ipcMain.handle('update-detail-view-bounds',
+    validateIpc(UpdateDetailViewBoundsSchema)(
+      async (event, bounds) => {
+        try {
+          console.log('IPC update-detail-view-bounds received:', bounds);
+          const context = windowContextManager.getContext(event.sender.id);
+          if (!context || !context.detailView || !context.window) {
+            console.warn('DetailView not found for bounds update');
+            return { success: false, error: 'DetailView not found' };
+          }
+
+          // Get window dimensions for validation
+          const windowBounds = context.window.getBounds();
+
+          // Validate bounds comprehensively (Requirements 4.1, 4.2, 8.3, 8.4, 8.5)
+          // This ensures:
+          // - Minimum dimensions (100px width/height)
+          // - Bounds don't exceed window dimensions
+          // - Non-negative values
+          // - Logs warnings for adjusted bounds
+          const validatedBounds = validateBoundsInMain(bounds, windowBounds.width, windowBounds.height);
+
+          context.detailView.setBounds(validatedBounds);
+          console.log('DetailView bounds updated:', validatedBounds);
+
+          return { success: true, bounds: validatedBounds };
+        } catch (error: any) {
+          console.error('IPC update-detail-view-bounds error:', error);
+          return { success: false, error: error.message };
+        }
       }
+    )
+  );
 
-      // Get window dimensions for validation
-      const windowBounds = context.window.getBounds();
-      
-      // Validate bounds comprehensively (Requirements 4.1, 4.2, 8.3, 8.4, 8.5)
-      // This ensures:
-      // - Minimum dimensions (100px width/height)
-      // - Bounds don't exceed window dimensions
-      // - Non-negative values
-      // - Logs warnings for adjusted bounds
-      const validatedBounds = validateBoundsInMain(bounds, windowBounds.width, windowBounds.height);
+  // Navigate to URL - ✅ VALIDATED (security: prevent arbitrary navigation with malicious URLs)
+  ipcMain.handle('navigate-to',
+    validateIpc(NavigateToSchema)(
+      async (event, data) => {
+        try {
+          console.log('IPC navigate-to received:', data.url);
+          const context = windowContextManager.getContext(event.sender.id);
+          if (!context || !context.detailView) {
+            throw new Error('DetailView not found for this window');
+          }
 
-      context.detailView.setBounds(validatedBounds);
-      console.log('DetailView bounds updated:', validatedBounds);
-
-      return { success: true, bounds: validatedBounds };
-    } catch (error: any) {
-      console.error('IPC update-detail-view-bounds error:', error);
-      return { success: false, error: error.message };
-    }
-  });
-
-  // Navigate to URL
-  ipcMain.handle('navigate-to', async (event, url: string) => {
-    try {
-      console.log('IPC navigate-to received:', url);
-      const context = windowContextManager.getContext(event.sender.id);
-      if (!context || !context.detailView) {
-        throw new Error('DetailView not found for this window');
+          await context.detailView.webContents.loadURL(data.url);
+          return { success: true };
+        } catch (error: any) {
+          console.error('IPC navigate-to error:', error);
+          // Return error object instead of throwing to allow graceful handling in renderer
+          return { success: false, error: error.message || 'Navigation failed' };
+        }
       }
-
-      await context.detailView.webContents.loadURL(url);
-      return { success: true };
-    } catch (error: any) {
-      console.error('IPC navigate-to error:', error);
-      // Return error object instead of throwing to allow graceful handling in renderer
-      return { success: false, error: error.message || 'Navigation failed' };
-    }
-  });
+    )
+  );
 
   // Go back
   ipcMain.handle('view:go-back', async (event) => {

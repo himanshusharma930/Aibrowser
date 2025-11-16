@@ -67,7 +67,7 @@ export const TabItem: React.FC<TabItemProps> = ({
       `}
       onClick={onSelect}
       onKeyDown={handleKeyDown}
-      role="button"
+      role="tab"
       tabIndex={0}
       aria-label={`Tab: ${tab.title || 'Untitled'}`}
       aria-selected={isActive}

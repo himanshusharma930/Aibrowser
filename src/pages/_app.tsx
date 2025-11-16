@@ -7,6 +7,7 @@ import { useLanguage } from '@/hooks/useLanguage';
 import { useEffect } from 'react';
 import { useLanguageStore } from '@/stores/languageStore';
 import i18n from '@/lib/i18n';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 export default function MyApp({ Component, pageProps }: AppProps) {
   const { antdLocale } = useLanguage();
@@ -33,10 +34,12 @@ export default function MyApp({ Component, pageProps }: AppProps) {
   }, [setLanguage]);
 
   return (
-    <ConfigProvider theme={theme} locale={antdLocale}>
-      <App className="h-full">
-        <Component {...pageProps} />
-      </App>
-    </ConfigProvider>
+    <ErrorBoundary>
+      <ConfigProvider theme={theme} locale={antdLocale}>
+        <App className="h-full">
+          <Component {...pageProps} />
+        </App>
+      </ConfigProvider>
+    </ErrorBoundary>
   );
 }

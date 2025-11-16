@@ -37,7 +37,7 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
           <div className={styles.workspaceOption}>
             {workspace.icon && <span className={styles.workspaceIcon}>{workspace.icon}</span>}
             <span className={styles.workspaceName}>{workspace.name}</span>
-            <span className={styles.workspaceTabCount}>({workspace.tabIds.length})</span>
+            <span className={styles.workspaceTabCount}>({(workspace.tabIds ?? []).length})</span>
           </div>
         </Option>
       ))}

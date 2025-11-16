@@ -85,21 +85,22 @@ export default function FileView() {
     };
 
     // Listen for file update events from main thread
-    if (window.api?.onFileUpdated) {
-      window.api.onFileUpdated(handleFileUpdated);
+    if (window.api?.util?.onFileUpdated) {
+      window.api.util.onFileUpdated(handleFileUpdated);
     }
 
     // Set loading state on initialization
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       if (fileState.content === '') {
         setFileState(prev => ({ ...prev, isLoading: false }));
       }
     }, 3000);
 
-    // Clean up listeners
+    // Clean up listeners and timer
     return () => {
-      if (window.api?.removeAllListeners) {
-        window.api.removeAllListeners('file-updated');
+      clearTimeout(timer);
+      if (window.api?.util?.removeAllListeners) {
+        window.api.util.removeAllListeners('file-updated');
       }
     };
   }, []);
@@ -249,7 +250,7 @@ export default function FileView() {
             </div>
           )}
         </Card>) : (<>
-        <iframe src={fileState.url} className='h-full bg-white' frameborder="0"></iframe>
+        <iframe src={fileState.url} className='h-full bg-white' frameBorder="0"></iframe>
         </>)}
         
       </Content>

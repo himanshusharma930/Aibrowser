@@ -38,7 +38,7 @@ describe('Checkpoint System Integration', () => {
        */
 
       // Verify handler is registered
-      const handlers = ipcMain._events['eko:run-checkpoint'];
+      const handlers = (ipcMain as any)._events?.['eko:run-checkpoint'];
       expect(handlers).toBeDefined();
 
       // Mock the handler call
@@ -270,7 +270,7 @@ describe('Checkpoint System Integration', () => {
       const files = await fs.readdir(testCheckpointsDir);
       expect(files.length).toBe(3);
 
-      const checkpoints = [];
+      const checkpoints: Array<{ taskId: any; status: any; timestamp: any; iteration: any; totalIterations: any; progress: number }> = [];
       for (const file of files) {
         const data = await fs.readJson(path.join(testCheckpointsDir, file));
         checkpoints.push({
@@ -515,7 +515,7 @@ describe('Checkpoint System Integration', () => {
       }
 
       // Simulate cleanup logic
-      const retained = [];
+      const retained: any[] = [];
       const sevenDaysMs = 7 * oneDay;
 
       for (const cp of checkpoints) {
