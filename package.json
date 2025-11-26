@@ -31,7 +31,7 @@
     "build:deps:watch": "concurrently \"ENTRY=index vite build --config electron/preload/vite.config.ts --watch\" \"ENTRY=view vite build --config electron/preload/vite.config.ts --watch\" \"vite build --config electron/main/vite.config.ts --watch\"",
     "build:deps:watch:win": "concurrently \"set ENTRY=index&& vite build --config electron/preload/vite.config.ts --watch\" \"set ENTRY=view&& vite build --config electron/preload/vite.config.ts --watch\" \"vite build --config electron/main/vite.config.ts --watch\"",
     "dev:win": "concurrently \"next dev -p 5173\" \"npm run build:deps:watch:win\" \"nodemon --exec electron ./dist/electron/main/index.mjs --watch electron\"",
-    "test": "jest",
+    "test": "jest --config=jest.config.js",
     "test:speech": "node test-speech.js",
     "test:speech:install": "chmod +x install-vosk.sh && ./install-vosk.sh",
     "test:speech:download-model": "mkdir -p public/models && wget https://alphacephei.com/vosk/models/vosk-model-small-cn-0.22.zip && unzip vosk-model-small-cn-0.22.zip -d public/models/"
