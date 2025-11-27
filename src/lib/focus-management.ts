@@ -529,10 +529,12 @@ export class AccessibleDropdownMenu {
  */
 export const globalFocusManager = new FocusManager();
 
-export default {
+const focusManagementExports = {
   FocusManager,
   KeyboardUtils,
   NavigationContext,
   AccessibleDropdownMenu,
   globalFocusManager
 };
+
+export default focusManagementExports;

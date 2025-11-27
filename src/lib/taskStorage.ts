@@ -269,7 +269,11 @@ export class TaskStorage {
         request.onsuccess = () => {
           completed++;
           if (completed === taskIds.length) {
-            errors.length > 0 ? reject(errors) : resolve();
+            if (errors.length > 0) {
+              reject(errors);
+            } else {
+              resolve();
+            }
           }
         };
         request.onerror = () => {

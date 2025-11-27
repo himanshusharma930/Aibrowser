@@ -485,10 +485,12 @@ export class AccessiblePageSetup {
   }
 }
 
-export default {
+const semanticHtmlExports = {
   SemanticHTML,
   LandmarkManager,
   DocumentOutlineGenerator,
   SemanticValidator,
   AccessiblePageSetup
 };
+
+export default semanticHtmlExports;
