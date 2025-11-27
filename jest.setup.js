@@ -1,14 +1,33 @@
 // Jest setup file for DOM testing
 require('@testing-library/jest-dom');
 
+// Mock electron BEFORE any other imports
 jest.mock('electron', () => ({
   app: {
-    getPath: jest.fn().mockReturnValue('/tmp/test'),
+    getPath: jest.fn((name) => {
+      switch (name) {
+        case 'userData':
+          return '/tmp/test/userData';
+        case 'temp':
+          return '/tmp/test/temp';
+        default:
+          return `/tmp/test/${name}`;
+      }
+    }),
     isPackaged: false,
+    getName: jest.fn().mockReturnValue('TestApp'),
+    getVersion: jest.fn().mockReturnValue('1.0.0'),
   },
   ipcMain: {
     on: jest.fn(),
     handle: jest.fn(),
+    removeHandler: jest.fn(),
+    _events: {},
+  },
+  ipcRenderer: {
+    invoke: jest.fn(),
+    on: jest.fn(),
+    removeAllListeners: jest.fn(),
   },
   BrowserWindow: {
     getAllWindows: jest.fn(() => [{
@@ -16,6 +35,14 @@ jest.mock('electron', () => ({
         send: jest.fn(),
       },
     }]),
+  },
+  dialog: {
+    showMessageBox: jest.fn(),
+    showOpenDialog: jest.fn(),
+    showSaveDialog: jest.fn(),
+  },
+  shell: {
+    openExternal: jest.fn(),
   },
 }));
 

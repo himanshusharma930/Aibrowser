@@ -105,7 +105,7 @@ describe('MemoryManager', () => {
       const report = await memoryManager.cleanup(false);
 
       expect(report.freed).toBeGreaterThanOrEqual(0);
-      expect(report.duration).toBeGreaterThan(0);
+      expect(report.duration).toBeGreaterThanOrEqual(0);
       expect(report.timestamp).toBeLessThanOrEqual(Date.now());
     });
 

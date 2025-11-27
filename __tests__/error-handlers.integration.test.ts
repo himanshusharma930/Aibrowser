@@ -3,15 +3,34 @@
  * Tests error handler IPC endpoints with mocked Electron ipcMain
  */
 
-import { errorHandler, ErrorCategory, ErrorSeverity } from '../electron/main/utils/error-handler';
-
-// Mock Electron ipcMain
+// Mock Electron BEFORE any other imports
 jest.mock('electron', () => ({
+  app: {
+    getPath: jest.fn((name) => {
+      switch (name) {
+        case 'userData':
+          return '/tmp/test/userData';
+        case 'temp':
+          return '/tmp/test/temp';
+        default:
+          return `/tmp/test/${name}`;
+      }
+    }),
+    isPackaged: false,
+    getName: jest.fn().mockReturnValue('TestApp'),
+    getVersion: jest.fn().mockReturnValue('1.0.0'),
+  },
   ipcMain: {
     handle: jest.fn(),
+    on: jest.fn(),
+    removeHandler: jest.fn(),
+  },
+  BrowserWindow: {
+    getAllWindows: jest.fn(() => []),
   },
 }));
 
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../electron/main/utils/error-handler';
 import { ipcMain } from 'electron';
 import { registerErrorHandlers } from '../electron/main/ipc/error-handlers';
 

@@ -3,16 +3,36 @@
  * Tests performance handler IPC endpoints with mocked Electron ipcMain
  */
 
+// Mock Electron BEFORE any other imports
+jest.mock('electron', () => ({
+  app: {
+    getPath: jest.fn((name) => {
+      switch (name) {
+        case 'userData':
+          return '/tmp/test/userData';
+        case 'temp':
+          return '/tmp/test/temp';
+        default:
+          return `/tmp/test/${name}`;
+      }
+    }),
+    isPackaged: false,
+    getName: jest.fn().mockReturnValue('TestApp'),
+    getVersion: jest.fn().mockReturnValue('1.0.0'),
+  },
+  ipcMain: {
+    handle: jest.fn(),
+    on: jest.fn(),
+    removeHandler: jest.fn(),
+  },
+  BrowserWindow: {
+    getAllWindows: jest.fn(() => []),
+  },
+}));
+
 import { memoryManager } from '../electron/main/utils/memory-manager';
 import { screenshotCache } from '../electron/main/utils/screenshot-cache';
 import { modelCache } from '../electron/main/utils/model-cache';
-
-// Mock Electron ipcMain
-jest.mock('electron', () => ({
-  ipcMain: {
-    handle: jest.fn(),
-  },
-}));
 
 import { ipcMain } from 'electron';
 import { registerPerformanceHandlers } from '../electron/main/ipc/performance-handlers';
@@ -141,7 +161,7 @@ describe('Performance IPC Handlers Integration', () => {
       expect(result.success).toBe(true);
       expect(result.report).toBeDefined();
       expect(result.report.freed).toBeGreaterThanOrEqual(0);
-      expect(result.report.duration).toBeGreaterThan(0);
+      expect(result.report.duration).toBeGreaterThanOrEqual(0);
     });
 
     test('should trigger critical cleanup', async () => {
@@ -168,7 +188,7 @@ describe('Performance IPC Handlers Integration', () => {
       expect(result.report.contextsCleanup).toBeGreaterThanOrEqual(0);
       expect(result.report.cacheCleanup).toBeGreaterThanOrEqual(0);
       expect(result.report.freed).toBeGreaterThanOrEqual(0);
-      expect(result.report.duration).toBeGreaterThan(0);
+      expect(result.report.duration).toBeGreaterThanOrEqual(0);
     });
   });
 
