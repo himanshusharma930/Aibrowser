@@ -425,7 +425,7 @@ Windows maintain separate but synchronized state:
 - Unit tests use Jest framework
 - Speech recognition testing via `pnpm test:speech` uses Vosk model from `public/models/`
 - Model download script available via `pnpm test:speech:download-model` for CI/CD setup
-- Speech SDK (`microsoft-cognitiveservices-speech-sdk`) for TTS integration
+- Microsoft Speech SDK (`microsoft-cognitiveservices-speech-sdk`) is OPTIONAL - only needed if using Microsoft speech recognition provider (install manually if needed)
 
 ## Development Tips
 

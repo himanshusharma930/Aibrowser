@@ -17,6 +17,19 @@ const nextConfig = {
     workerThreads: false, // Disable worker threads
     cpus: 1, // Limit CPU usage
   },
+
+  // Webpack configuration for better HMR
+  webpack: (config, { dev, isServer }) => {
+    if (dev && !isServer) {
+      // Improve HMR for large bundles
+      config.watchOptions = {
+        poll: 1000,
+        aggregateTimeout: 300,
+      };
+    }
+
+    return config;
+  },
   
   // Reduce page data size
   compress: false, // Let nginx handle compression
