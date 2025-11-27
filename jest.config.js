@@ -1,7 +1,7 @@
 /** @type {import('jest').Config} */
 const config = {
   preset: 'ts-jest',
-  testEnvironment: 'jsdom',
+  testEnvironment: 'node',
   roots: ['<rootDir>/src', '<rootDir>/__tests__', '<rootDir>/electron'],
   testMatch: [
     '**/__tests__/**/*.test.ts',
@@ -17,6 +17,7 @@ const config = {
       tsconfig: 'tsconfig.test.json',
     }],
   },
+  resetMocks: true,
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
   collectCoverageFrom: [
     'src/components/TabBar.tsx',

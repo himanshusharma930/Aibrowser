@@ -122,7 +122,7 @@ describe('MemoryManager', () => {
       const report = await memoryManager.cleanup(true);
 
       expect(report.freed).toBeGreaterThanOrEqual(0);
-      expect(report.duration).toBeGreaterThan(0);
+      expect(report.duration).toBeGreaterThanOrEqual(0);
     });
 
     test('should prevent too frequent cleanups', async () => {

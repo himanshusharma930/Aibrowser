@@ -1,6 +1,24 @@
 // Jest setup file for DOM testing
 require('@testing-library/jest-dom');
 
+jest.mock('electron', () => ({
+  app: {
+    getPath: jest.fn().mockReturnValue('/tmp/test'),
+    isPackaged: false,
+  },
+  ipcMain: {
+    on: jest.fn(),
+    handle: jest.fn(),
+  },
+  BrowserWindow: {
+    getAllWindows: jest.fn(() => [{
+      webContents: {
+        send: jest.fn(),
+      },
+    }]),
+  },
+}));
+
 // Mock window.api for Electron IPC
 global.window = global.window || {};
 global.window.api = {
